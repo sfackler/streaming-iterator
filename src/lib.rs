@@ -23,6 +23,17 @@ pub trait StreamingIterator {
     }
 
     #[inline]
+    fn count(mut self) -> usize
+        where Self: Sized
+    {
+        let mut count = 0;
+        while let Some(_) = self.next() {
+            count += 1;
+        }
+        count
+    }
+
+    #[inline]
     fn filter<F>(self, f: F) -> Filter<Self, F>
         where Self: Sized,
               F: FnMut(&Self::Item) -> bool
@@ -34,14 +45,11 @@ pub trait StreamingIterator {
     }
 
     #[inline]
-    fn count(mut self) -> usize
-        where Self: Sized
+    fn owned(self) -> Owned<Self>
+        where Self: Sized,
+              Self::Item: ToOwned
     {
-        let mut count = 0;
-        while let Some(_) = self.next() {
-            count += 1;
-        }
-        count
+        Owned(self)
     }
 }
 
@@ -140,6 +148,25 @@ impl<I, F> StreamingIterator for Filter<I, F>
     }
 }
 
+pub struct Owned<I>(I);
+
+impl<I> Iterator for Owned<I>
+where I: StreamingIterator,
+      I::Item: Sized + ToOwned
+{
+    type Item = <I::Item as ToOwned>::Owned;
+
+    #[inline]
+    fn next(&mut self) -> Option<<I::Item as ToOwned>::Owned> {
+        self.0.next().map(ToOwned::to_owned)
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -189,5 +216,12 @@ mod test {
         let items = [0, 1, 2, 3];
         let it = convert(items.iter());
         assert_eq!(it.count(), 4);
+    }
+
+    #[test]
+    fn owned() {
+        let items = [0, 1];
+        let it = convert(items.iter().cloned()).owned();
+        assert_eq!(it.collect::<Vec<_>>(), items);
     }
 }
