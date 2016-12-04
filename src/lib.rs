@@ -7,6 +7,11 @@ pub trait StreamingIterator {
     fn get(&self) -> Option<&Self::Item>;
 
     #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (usize::max_value(), None)
+    }
+
+    #[inline]
     fn next(&mut self) -> Option<&Self::Item> {
         self.advance();
         self.get()
@@ -66,6 +71,11 @@ impl<I> StreamingIterator for Convert<I>
     fn get(&self) -> Option<&I::Item> {
         self.item.as_ref()
     }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.it.size_hint()
+    }
 }
 
 pub struct Filter<I, F> {
@@ -91,6 +101,11 @@ impl<I, F> StreamingIterator for Filter<I, F>
     #[inline]
     fn get(&self) -> Option<&I::Item> {
         self.it.get()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, self.it.size_hint().1)
     }
 }
 
