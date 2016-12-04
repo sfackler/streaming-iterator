@@ -3,4 +3,7 @@ name = "streaming-iterator"
 version = "0.1.0"
 authors = ["Steven Fackler <sfackler@gmail.com>"]
 
+[features]
+std = []
+
 [dependencies]

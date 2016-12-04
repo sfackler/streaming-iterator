@@ -24,6 +24,7 @@
 //! single entry, multiple exit borrows). If `StreamingIterator` was defined like `Iterator` with
 //! just a required `next` method, operations like `filter` would be impossible to define.
 #![warn(missing_docs)]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 /// An interface for dealing with streaming iterators.
 pub trait StreamingIterator {
@@ -97,6 +98,9 @@ pub trait StreamingIterator {
 
     /// Creates a normal, non-streaming, iterator with elements produced by calling `to_owned` on
     /// the elements of this iterator.
+    ///
+    /// Requires the `std` feature.
+    #[cfg(feature = "std")]
     #[inline]
     fn owned(self) -> Owned<Self>
         where Self: Sized,
@@ -211,8 +215,10 @@ impl<I, F> StreamingIterator for Filter<I, F>
 
 /// A normal, non-streaming, iterator which converts the elements of a streaming iterator into owned
 /// versions.
+#[cfg(feature = "std")]
 pub struct Owned<I>(I);
 
+#[cfg(feature = "std")]
 impl<I> Iterator for Owned<I>
     where I: StreamingIterator,
           I::Item: Sized + ToOwned
@@ -282,6 +288,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn owned() {
         let items = [0, 1];
         let it = convert(items.iter().cloned()).owned();
