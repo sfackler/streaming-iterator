@@ -115,6 +115,11 @@ impl<I> StreamingIterator for Convert<I>
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.it.size_hint()
     }
+
+    #[inline]
+    fn count(self) -> usize {
+        self.it.count()
+    }
 }
 
 pub struct Filter<I, F> {
