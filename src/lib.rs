@@ -1,6 +1,6 @@
 
 pub trait StreamingIterator {
-    type Item;
+    type Item: ?Sized;
 
     fn advance(&mut self);
 
@@ -14,7 +14,12 @@ pub trait StreamingIterator {
     #[inline]
     fn next(&mut self) -> Option<&Self::Item> {
         self.advance();
-        self.get()
+        (*self).get()
+    }
+
+    #[inline]
+    fn by_ref(&mut self) -> &mut Self {
+        self
     }
 
     #[inline]
@@ -37,6 +42,32 @@ pub trait StreamingIterator {
             count += 1;
         }
         count
+    }
+}
+
+impl<'a, I: ?Sized> StreamingIterator for &'a mut I
+    where I: StreamingIterator
+{
+    type Item = I::Item;
+
+    #[inline]
+    fn advance(&mut self) {
+        (**self).advance()
+    }
+
+    #[inline]
+    fn get(&self) -> Option<&Self::Item> {
+        (**self).get()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (**self).size_hint()
+    }
+
+    #[inline]
+    fn next(&mut self) -> Option<&Self::Item> {
+        (**self).next()
     }
 }
 
