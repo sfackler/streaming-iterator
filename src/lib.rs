@@ -8,7 +8,7 @@ pub trait StreamingIterator {
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (usize::max_value(), None)
+        (0, None)
     }
 
     #[inline]
