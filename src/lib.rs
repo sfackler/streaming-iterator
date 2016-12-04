@@ -1,27 +1,76 @@
+//! Streaming iterators.
+//!
+//! The iterator APIs in the Rust standard library do not allow elements to be yielded which borrow
+//! from the iterator itself. That means, for example, that the `std::io::Lines` iterator must
+//! allocate a new `String` for each line rather than reusing an internal buffer. The
+//!`StreamingIterator` trait instead provides access to elements being iterated over only by
+//! reference rather than by value.
+//!
+//! `StreamingIterator`s cannot be used in Rust `for` loops, but `while let` loops offer a similar
+//! level of ergonomics:
+//!
+//! ```ignore
+//! while let Some(item) = iter.next() {
+//!     // work with item
+//! }
+//! ```
+//!
+//! While the standard `Iterator` trait's functionality is based off of the `next` method,
+//! `StreamingIterator`'s functionality is based off of a pair of methods: `advance` and `get`. This
+//! essentially splits the logic of `next` in half (in fact, `StreamingIterator`'s `next` method
+//! does nothing but call `advance` followed by `get`).
+//!
+//! This is required because of Rust's lexical handling of borrows (more specifically a lack of
+//! single entry, multiple exit borrows). If `StreamingIterator` was defined like `Iterator` with
+//! just a required `next` method, operations like `filter` would be impossible to define.
+#![warn(missing_docs)]
 
+/// An interface for dealing with streaming iterators.
 pub trait StreamingIterator {
+    /// The type of the elements being iterated over.
     type Item: ?Sized;
 
+    /// Advances the iterator to the next element.
+    ///
+    /// Iterators start just before the first element, so this should be called before `get`.
+    ///
+    /// The behavior of calling this method after the end of the iterator has been reached is
+    /// unspecified.
     fn advance(&mut self);
 
+    /// Returns a reference to the current element of the iterator.
+    ///
+    /// The behavior of calling this method before `advance` has been called is unspecified.
     fn get(&self) -> Option<&Self::Item>;
 
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, None)
-    }
-
+    /// Advances the iterator and returns the next value.
+    ///
+    /// The behavior of calling this method after the end of the iterator has been reached is
+    /// unspecified.
+    ///
+    /// The default implementation simply calls `advance` followed by `get`.
     #[inline]
     fn next(&mut self) -> Option<&Self::Item> {
         self.advance();
         (*self).get()
     }
 
+    /// Returns the bounds on the remaining length of the iterator.
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, None)
+    }
+
+    /// Borrows an iterator, rather than consuming it.
+    ///
+    /// This is useful to allow the application of iterator adaptors while still retaining ownership
+    /// of the original adaptor.
     #[inline]
     fn by_ref(&mut self) -> &mut Self {
         self
     }
 
+    /// Consumes the iterator, counting the number of remaining elements and returning it.
     #[inline]
     fn count(mut self) -> usize
         where Self: Sized
@@ -33,6 +82,8 @@ pub trait StreamingIterator {
         count
     }
 
+    /// Creates a streaming iterator which uses a closure to determine if an element should be
+    /// yielded.
     #[inline]
     fn filter<F>(self, f: F) -> Filter<Self, F>
         where Self: Sized,
@@ -44,6 +95,8 @@ pub trait StreamingIterator {
         }
     }
 
+    /// Creates a normal, non-streaming, iterator with elements produced by calling `to_owned` on
+    /// the elements of this iterator.
     #[inline]
     fn owned(self) -> Owned<Self>
         where Self: Sized,
@@ -79,6 +132,7 @@ impl<'a, I: ?Sized> StreamingIterator for &'a mut I
     }
 }
 
+/// Turns a normal, non-streaming iterator into a streaming iterator.
 #[inline]
 pub fn convert<I>(it: I) -> Convert<I>
     where I: Iterator
@@ -89,6 +143,7 @@ pub fn convert<I>(it: I) -> Convert<I>
     }
 }
 
+/// A streaming iterator which yields elements from a normal, non-streaming, iterator.
 pub struct Convert<I>
     where I: Iterator
 {
@@ -122,6 +177,7 @@ impl<I> StreamingIterator for Convert<I>
     }
 }
 
+/// A streaming iterator which filters the elements of a streaming iterator with a predicate.
 pub struct Filter<I, F> {
     it: I,
     f: F,
@@ -153,11 +209,13 @@ impl<I, F> StreamingIterator for Filter<I, F>
     }
 }
 
+/// A normal, non-streaming, iterator which converts the elements of a streaming iterator into owned
+/// versions.
 pub struct Owned<I>(I);
 
 impl<I> Iterator for Owned<I>
-where I: StreamingIterator,
-      I::Item: Sized + ToOwned
+    where I: StreamingIterator,
+          I::Item: Sized + ToOwned
 {
     type Item = <I::Item as ToOwned>::Owned;
 
