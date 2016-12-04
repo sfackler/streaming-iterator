@@ -96,6 +96,21 @@ pub trait StreamingIterator {
         }
     }
 
+    /// Creates an iterator which is "well behaved" at the beginning and end of iteration
+    ///
+    /// The behavior of calling `get` before iteration has been started, and of continuing to call
+    /// `advance` after `get` has returned `None` is normally unspecified, but this guarantees that
+    /// `get` will return `None` in both cases.
+    #[inline]
+    fn fuse(self) -> Fuse<Self>
+        where Self: Sized
+    {
+        Fuse {
+            it: self,
+            state: FuseState::Start,
+        }
+    }
+
     /// Creates a normal, non-streaming, iterator with elements produced by calling `to_owned` on
     /// the elements of this iterator.
     ///
@@ -213,6 +228,93 @@ impl<I, F> StreamingIterator for Filter<I, F>
     }
 }
 
+enum FuseState {
+    Start,
+    Middle,
+    End,
+}
+
+/// A streaming iterator which is well-defined before and after iteration.
+pub struct Fuse<I> {
+    it: I,
+    state: FuseState,
+}
+
+impl<I> StreamingIterator for Fuse<I>
+    where I: StreamingIterator
+{
+    type Item = I::Item;
+
+    #[inline]
+    fn advance(&mut self) {
+        match self.state {
+            FuseState::Start => {
+                self.it.advance();
+                self.state = match self.it.get() {
+                    Some(_) => FuseState::Middle,
+                    None => FuseState::End,
+                };
+            }
+            FuseState::Middle => {
+                self.it.advance();
+                if let None = self.it.get() {
+                    self.state = FuseState::End;
+                }
+            }
+            FuseState::End => {}
+        }
+    }
+
+    #[inline]
+    fn get(&self) -> Option<&I::Item> {
+        match self.state {
+            FuseState::Start | FuseState::End => None,
+            FuseState::Middle => self.it.get(),
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.it.size_hint()
+    }
+
+    #[inline]
+    fn next(&mut self) -> Option<&I::Item> {
+        match self.state {
+            FuseState::Start => {
+                match self.it.next() {
+                    Some(i) => {
+                        self.state = FuseState::Middle;
+                        Some(i)
+                    }
+                    None => {
+                        self.state = FuseState::End;
+                        None
+                    }
+                }
+            }
+            FuseState::Middle => {
+                match self.it.next() {
+                    Some(i) => Some(i),
+                    None => {
+                        self.state = FuseState::End;
+                        None
+                    }
+                }
+            }
+            FuseState::End => None,
+        }
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        match self.state {
+            FuseState::Start | FuseState::Middle => self.it.count(),
+            FuseState::End => 0,
+        }
+    }
+}
+
 /// A normal, non-streaming, iterator which converts the elements of a streaming iterator into owned
 /// versions.
 #[cfg(feature = "std")]
@@ -261,6 +363,13 @@ mod test {
     }
 
     #[test]
+    fn count() {
+        let items = [0, 1, 2, 3];
+        let it = convert(items.iter());
+        assert_eq!(it.count(), 4);
+    }
+
+    #[test]
     fn filter() {
         let items = [0, 1, 2, 3];
         let mut it = convert(items.iter().cloned()).filter(|x| x % 2 == 0);
@@ -281,10 +390,39 @@ mod test {
     }
 
     #[test]
-    fn count() {
-        let items = [0, 1, 2, 3];
-        let it = convert(items.iter());
-        assert_eq!(it.count(), 4);
+    fn fuse() {
+        struct Flicker(i32);
+
+        impl StreamingIterator for Flicker {
+            type Item = i32;
+
+            fn advance(&mut self) {
+                self.0 += 1;
+            }
+
+            fn get(&self) -> Option<&i32> {
+                if self.0 % 4 == 3 {
+                    None
+                } else {
+                    Some(&self.0)
+                }
+            }
+        }
+
+        let mut it = Flicker(0).fuse();
+        assert_eq!(it.get(), None);
+        it.advance();
+        assert_eq!(it.get(), Some(&1));
+        assert_eq!(it.get(), Some(&1));
+        it.advance();
+        assert_eq!(it.get(), Some(&2));
+        assert_eq!(it.get(), Some(&2));
+        it.advance();
+        assert_eq!(it.get(), None);
+        assert_eq!(it.get(), None);
+        it.advance();
+        assert_eq!(it.get(), None);
+        assert_eq!(it.get(), None);
     }
 
     #[test]
