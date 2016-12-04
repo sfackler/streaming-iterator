@@ -6,6 +6,11 @@ pub trait StreamingIterator {
 
     fn get(&self) -> Option<&Self::Item>;
 
+    fn next(&mut self) -> Option<&Self::Item> {
+        self.advance();
+        self.get()
+    }
+
     fn filter<F>(self, f: F) -> Filter<Self, F>
         where Self: Sized,
               F: FnMut(&Self::Item) -> bool
@@ -20,11 +25,7 @@ pub trait StreamingIterator {
         where Self: Sized
     {
         let mut count = 0;
-        loop {
-            self.advance();
-            if let None = self.get() {
-                break;
-            }
+        while let Some(_) = self.next() {
             count += 1;
         }
         count
@@ -73,16 +74,9 @@ impl<I, F> StreamingIterator for Filter<I, F>
     type Item = I::Item;
 
     fn advance(&mut self) {
-        loop {
-            self.it.advance();
-
-            match self.it.get() {
-                Some(i) => {
-                    if (self.f)(i) {
-                        break;
-                    }
-                }
-                None => break,
+        while let Some(i) = self.it.next() {
+            if (self.f)(i) {
+                break;
             }
         }
     }
