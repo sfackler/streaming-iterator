@@ -193,6 +193,20 @@ pub trait StreamingIterator {
         }
     }
 
+    /// Creates an iterator which transforms elements of this iterator by passing them to a closure.
+    ///
+    /// Unlike `map`, this method takes a closure that returns a reference into the original value.
+    #[inline]
+    fn map_ref<B: ?Sized, F>(self, f: F) -> MapRef<Self, F>
+        where Self: Sized,
+              F: Fn(&Self::Item) -> &B
+    {
+        MapRef {
+            it: self,
+            f: f,
+        }
+    }
+
     /// Consumes the first `n` elements of the iterator, returning the next one.
     #[inline]
     fn nth(&mut self, n: usize) -> Option<&Self::Item> {
@@ -571,6 +585,39 @@ impl<I, B, F> StreamingIterator for Map<I, B, F>
     }
 }
 
+/// A streaming iterator which transforms the elements of a streaming iterator.
+pub struct MapRef<I, F> {
+    it: I,
+    f: F,
+}
+
+impl<I, B: ?Sized, F> StreamingIterator for MapRef<I, F>
+    where I: StreamingIterator,
+          F: Fn(&I::Item) -> &B
+{
+    type Item = B;
+
+    #[inline]
+    fn advance(&mut self) {
+        self.it.advance();
+    }
+
+    #[inline]
+    fn get(&self) -> Option<&B> {
+        self.it.get().map(&self.f)
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.it.size_hint()
+    }
+
+    #[inline]
+    fn next(&mut self) -> Option<&B> {
+        self.it.next().map(&self.f)
+    }
+}
+
 /// A normal, non-streaming, iterator which converts the elements of a streaming iterator into owned
 /// versions.
 ///
@@ -874,6 +921,16 @@ mod test {
         let items = [0, 1];
         let it = convert(items.iter().map(|&i| i as usize)).map(|&i| i as i32);
         test(it, &items);
+    }
+
+    #[test]
+    fn map_ref() {
+        #[derive(Clone)]
+        struct Foo(i32);
+
+        let items = [Foo(0), Foo(1)];
+        let it = convert(items.iter().cloned()).map_ref(|f| &f.0);
+        test(it, &[0, 1]);
     }
 
     #[test]
