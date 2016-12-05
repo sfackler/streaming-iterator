@@ -269,6 +269,19 @@ pub trait StreamingIterator {
             done: false,
         }
     }
+
+    /// Creates an iterator which only returns initial elements matching a predicate.
+    #[inline]
+    fn take_while<F>(self, f: F) -> TakeWhile<Self, F>
+        where Self: Sized,
+              F: FnMut(&Self::Item) -> bool
+    {
+        TakeWhile {
+            it: self,
+            f: f,
+            done: false,
+        }
+    }
 }
 
 impl<'a, I: ?Sized> StreamingIterator for &'a mut I
@@ -689,6 +702,70 @@ impl<I> StreamingIterator for Take<I>
     }
 }
 
+/// A streaming iterator which only returns initial elements matching a predicate.
+pub struct TakeWhile<I, F> {
+    it: I,
+    f: F,
+    done: bool,
+}
+
+impl<I, F> StreamingIterator for TakeWhile<I, F>
+    where I: StreamingIterator,
+          F: FnMut(&I::Item) -> bool
+{
+    type Item = I::Item;
+
+    #[inline]
+    fn advance(&mut self) {
+        if !self.done {
+            self.it.advance();
+            if let Some(i) = self.it.get() {
+                if !(self.f)(i) {
+                    self.done = true;
+                }
+            }
+        }
+    }
+
+    #[inline]
+    fn get(&self) -> Option<&I::Item> {
+        if self.done {
+            None
+        } else {
+            self.it.get()
+        }
+    }
+
+    #[inline]
+    fn next(&mut self) -> Option<&I::Item> {
+        if self.done {
+            None
+        } else {
+            match self.it.next() {
+                Some(i) => {
+                    if (self.f)(i) {
+                        Some(i)
+                    } else {
+                        self.done = true;
+                        None
+                    }
+                }
+                None => None
+            }
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let upper = if self.done {
+            Some(0)
+        } else {
+            self.it.size_hint().1
+        };
+        (0, upper)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use core::fmt::Debug;
@@ -870,5 +947,14 @@ mod test {
         test(it.clone().take(0), &[]);
         test(it.clone().take(2), &[0, 1]);
         test(it.clone().take(5), &[0, 1, 2, 3]);
+    }
+
+    #[test]
+    fn take_while() {
+        let items = [0, 1, 2, 3];
+        let it = convert(items.iter().cloned());
+        test(it.clone().take_while(|&i| i < 0), &[]);
+        test(it.clone().take_while(|&i| i < 2), &[0, 1]);
+        test(it.clone().take_while(|&i| i < 5), &[0, 1, 2, 3]);
     }
 }
