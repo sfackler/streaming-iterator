@@ -245,6 +245,19 @@ pub trait StreamingIterator {
         }
     }
 
+    /// Creates an iterator that skips initial elements matching a predicate.
+    #[inline]
+    fn skip_while<F>(self, f: F) -> SkipWhile<Self, F>
+        where Self: Sized,
+              F: FnMut(&Self::Item) -> bool
+    {
+        SkipWhile {
+            it: self,
+            f: f,
+            done: false,
+        }
+    }
+
     /// Creates an iterator which only returns the first `n` elements.
     #[inline]
     fn take(self, n: usize) -> Take<Self>
@@ -600,6 +613,43 @@ impl<I> StreamingIterator for Skip<I>
     }
 }
 
+/// A streaming iterator which skips initial elements that match a predicate
+#[derive(Clone)]
+pub struct SkipWhile<I, F> {
+    it: I,
+    f: F,
+    done: bool,
+}
+
+impl<I, F> StreamingIterator for SkipWhile<I, F>
+    where I: StreamingIterator,
+          F: FnMut(&I::Item) -> bool
+{
+    type Item = I::Item;
+
+    #[inline]
+    fn advance(&mut self) {
+        if !self.done {
+            let f = &mut self.f;
+            self.it.find(|i| !f(i));
+            self.done = true;
+        } else {
+            self.it.advance();
+        }
+    }
+
+    #[inline]
+    fn get(&self) -> Option<&I::Item> {
+        self.it.get()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let hint = self.it.size_hint();
+        (0, hint.1)
+    }
+}
+
 /// A streaming iterator which only yields a limited number of elements in a streaming iterator.
 #[derive(Clone)]
 pub struct Take<I> {
@@ -802,6 +852,15 @@ mod test {
         test(it.clone().skip(0), &[0, 1, 2, 3]);
         test(it.clone().skip(2), &[2, 3]);
         test(it.clone().skip(5), &[]);
+    }
+
+    #[test]
+    fn skip_while() {
+        let items = [0, 1, 2, 3];
+        let it = convert(items.iter().cloned());
+        test(it.clone().skip_while(|&i| i < 0), &[0, 1, 2, 3]);
+        test(it.clone().skip_while(|&i| i < 2), &[2, 3]);
+        test(it.clone().skip_while(|&i| i < 5), &[]);
     }
 
     #[test]
