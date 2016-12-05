@@ -205,6 +205,23 @@ pub trait StreamingIterator {
     {
         Owned(self)
     }
+
+    /// Returns the index of the first element of the iterator matching a predicate.
+    #[inline]
+    fn position<F>(&mut self, mut f: F) -> Option<usize>
+        where F: FnMut(&Self::Item) -> bool
+    {
+        let mut n = 0;
+
+        while let Some(i) = self.next() {
+            if f(i) {
+                return Some(n);
+            }
+            n += 1;
+        }
+
+        None
+    }
 }
 
 impl<'a, I: ?Sized> StreamingIterator for &'a mut I
@@ -634,5 +651,13 @@ mod test {
         let items = [0, 1];
         let it = convert(items.iter().cloned()).owned();
         assert_eq!(it.collect::<Vec<_>>(), items);
+    }
+
+    #[test]
+    fn position() {
+        let items = [0, 1];
+        let it = convert(items.iter().cloned());
+        assert_eq!(it.clone().position(|&x| x % 2 == 1), Some(1));
+        assert_eq!(it.clone().position(|&x| x % 3 == 2), None);
     }
 }
