@@ -96,6 +96,15 @@ pub trait StreamingIterator {
         self
     }
 
+    /// Produces a normal, non-streaming, iterator by cloning the elements of this iterator.
+    #[inline]
+    fn cloned(self) -> Cloned<Self>
+        where Self: Sized,
+              Self::Item: Clone
+    {
+        Cloned(self)
+    }
+
     /// Consumes the iterator, counting the number of remaining elements and returning it.
     #[inline]
     fn count(mut self) -> usize
@@ -258,6 +267,28 @@ pub fn convert<I>(it: I) -> Convert<I>
     Convert {
         it: it,
         item: None,
+    }
+}
+
+/// A normal, non-streaming, iterator which converts the elements of a streaming iterator into owned
+/// values by cloning them.
+#[derive(Clone)]
+pub struct Cloned<I>(I);
+
+impl<I> Iterator for Cloned<I>
+    where I: StreamingIterator,
+          I::Item: Clone
+{
+    type Item = I::Item;
+
+    #[inline]
+    fn next(&mut self) -> Option<I::Item> {
+        self.0.next().map(Clone::clone)
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
     }
 }
 
@@ -548,6 +579,15 @@ mod test {
         let it = convert(items.iter().cloned());
         assert!(it.clone().any(|&i| i > 1));
         assert!(!it.clone().any(|&i| i > 2));
+    }
+
+    #[test]
+    fn cloned() {
+        let items = [0, 1];
+        let mut it = convert(items.iter().cloned()).cloned();
+        assert_eq!(it.next(), Some(0));
+        assert_eq!(it.next(), Some(1));
+        assert_eq!(it.next(), None);
     }
 
     #[test]
