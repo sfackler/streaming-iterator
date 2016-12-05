@@ -26,6 +26,9 @@
 #![warn(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
+#[cfg(all(test, feature = "std"))]
+extern crate core;
+
 /// An interface for dealing with streaming iterators.
 pub trait StreamingIterator {
     /// The type of the elements being iterated over.
@@ -108,6 +111,19 @@ pub trait StreamingIterator {
         Fuse {
             it: self,
             state: FuseState::Start,
+        }
+    }
+
+    /// Creates an iterator which transforms elements of this iterator by passing them to a closure.
+    #[inline]
+    fn map<B, F>(self, f: F) -> Map<Self, B, F>
+        where Self: Sized,
+              F: FnMut(&Self::Item) -> B
+    {
+        Map {
+            it: self,
+            f: f,
+            item: None,
         }
     }
 
@@ -315,8 +331,39 @@ impl<I> StreamingIterator for Fuse<I>
     }
 }
 
+/// A streaming iterator which transforms the elements of a streaming iterator.
+pub struct Map<I, B, F> {
+    it: I,
+    f: F,
+    item: Option<B>,
+}
+
+impl<I, B, F> StreamingIterator for Map<I, B, F>
+    where I: StreamingIterator,
+          F: FnMut(&I::Item) -> B
+{
+    type Item = B;
+
+    #[inline]
+    fn advance(&mut self) {
+        self.item = self.it.next().map(&mut self.f);
+    }
+
+    #[inline]
+    fn get(&self) -> Option<&B> {
+        self.item.as_ref()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.it.size_hint()
+    }
+}
+
 /// A normal, non-streaming, iterator which converts the elements of a streaming iterator into owned
 /// versions.
+///
+/// Requires the `std` feature.
 #[cfg(feature = "std")]
 pub struct Owned<I>(I);
 
@@ -340,26 +387,29 @@ impl<I> Iterator for Owned<I>
 
 #[cfg(test)]
 mod test {
+    use core::fmt::Debug;
+
     use super::*;
+
+    fn test<I>(mut it: I, expected: &[I::Item])
+        where I: StreamingIterator,
+              I::Item: Sized + PartialEq + Debug,
+    {
+        for item in expected {
+            it.advance();
+            assert_eq!(it.get(), Some(item));
+            assert_eq!(it.get(), Some(item));
+        }
+        it.advance();
+        assert_eq!(it.get(), None);
+        assert_eq!(it.get(), None);
+    }
 
     #[test]
     fn test_convert() {
         let items = [0, 1];
-        let mut it = convert(items.iter().cloned());
-        assert_eq!(it.get(), None);
-        assert_eq!(it.get(), None);
-        it.advance();
-        assert_eq!(it.get(), Some(&0));
-        assert_eq!(it.get(), Some(&0));
-        it.advance();
-        assert_eq!(it.get(), Some(&1));
-        assert_eq!(it.get(), Some(&1));
-        it.advance();
-        assert_eq!(it.get(), None);
-        assert_eq!(it.get(), None);
-        it.advance();
-        assert_eq!(it.get(), None);
-        assert_eq!(it.get(), None);
+        let it = convert(items.iter().cloned());
+        test(it, &items);
     }
 
     #[test]
@@ -372,21 +422,8 @@ mod test {
     #[test]
     fn filter() {
         let items = [0, 1, 2, 3];
-        let mut it = convert(items.iter().cloned()).filter(|x| x % 2 == 0);
-        assert_eq!(it.get(), None);
-        assert_eq!(it.get(), None);
-        it.advance();
-        assert_eq!(it.get(), Some(&0));
-        assert_eq!(it.get(), Some(&0));
-        it.advance();
-        assert_eq!(it.get(), Some(&2));
-        assert_eq!(it.get(), Some(&2));
-        it.advance();
-        assert_eq!(it.get(), None);
-        assert_eq!(it.get(), None);
-        it.advance();
-        assert_eq!(it.get(), None);
-        assert_eq!(it.get(), None);
+        let it = convert(items.iter().cloned()).filter(|x| x % 2 == 0);
+        test(it, &[0, 2]);
     }
 
     #[test]
@@ -423,6 +460,13 @@ mod test {
         it.advance();
         assert_eq!(it.get(), None);
         assert_eq!(it.get(), None);
+    }
+
+    #[test]
+    fn map() {
+        let items = [0, 1];
+        let it = convert(items.iter().map(|&i| i as usize)).map(|&i| i as i32);
+        test(it, &items);
     }
 
     #[test]
