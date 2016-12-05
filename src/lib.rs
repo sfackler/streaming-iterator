@@ -26,8 +26,10 @@
 #![warn(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
-#[cfg(all(test, feature = "std"))]
+#[cfg(feature = "std")]
 extern crate core;
+
+use core::cmp;
 
 /// An interface for dealing with streaming iterators.
 pub trait StreamingIterator {
@@ -590,6 +592,12 @@ impl<I> StreamingIterator for Skip<I>
     fn get(&self) -> Option<&I::Item> {
         self.it.get()
     }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let hint = self.it.size_hint();
+        (hint.0.saturating_sub(self.n), hint.1.map(|n| n.saturating_sub(self.n)))
+    }
 }
 
 /// A streaming iterator which only yields a limited number of elements in a streaming iterator.
@@ -622,6 +630,12 @@ impl<I> StreamingIterator for Take<I>
         } else {
             self.it.get()
         }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let hint = self.it.size_hint();
+        (cmp::min(hint.0, self.n), Some(self.n))
     }
 }
 
