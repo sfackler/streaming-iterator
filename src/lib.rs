@@ -86,8 +86,7 @@ pub trait StreamingIterator {
         count
     }
 
-    /// Creates a streaming iterator which uses a closure to determine if an element should be
-    /// yielded.
+    /// Creates an iterator which uses a closure to determine if an element should be yielded.
     #[inline]
     fn filter<F>(self, f: F) -> Filter<Self, F>
         where Self: Sized,
@@ -96,6 +95,19 @@ pub trait StreamingIterator {
         Filter {
             it: self,
             f: f,
+        }
+    }
+
+    /// Creates an iterator which both filters and maps by applying a closure to elements.
+    #[inline]
+    fn filter_map<B, F>(self, f: F) -> FilterMap<Self, B, F>
+        where Self: Sized,
+              F: FnMut(&Self::Item) -> Option<B>
+    {
+        FilterMap {
+            it: self,
+            f: f,
+            item: None,
         }
     }
 
@@ -236,6 +248,48 @@ impl<I, F> StreamingIterator for Filter<I, F>
     #[inline]
     fn get(&self) -> Option<&I::Item> {
         self.it.get()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, self.it.size_hint().1)
+    }
+}
+
+/// An iterator which both filters and maps elements of a streaming iterator with a closure.
+pub struct FilterMap<I, B, F> {
+    it: I,
+    f: F,
+    item: Option<B>,
+}
+
+impl<I, B, F> StreamingIterator for FilterMap<I, B, F>
+    where I: StreamingIterator,
+          F: FnMut(&I::Item) -> Option<B>
+{
+    type Item = B;
+
+    #[inline]
+    fn advance(&mut self) {
+        loop {
+            match self.it.next() {
+                Some(i) => {
+                    if let Some(i) = (self.f)(i) {
+                        self.item = Some(i);
+                        break;
+                    }
+                }
+                None => {
+                    self.item = None;
+                    break;
+                }
+            }
+        }
+    }
+
+    #[inline]
+    fn get(&self) -> Option<&B> {
+        self.item.as_ref()
     }
 
     #[inline]
@@ -467,6 +521,20 @@ mod test {
         let items = [0, 1];
         let it = convert(items.iter().map(|&i| i as usize)).map(|&i| i as i32);
         test(it, &items);
+    }
+
+    #[test]
+    fn filter_map() {
+        let items = [0u8, 1, 1, 2, 4];
+        let it = convert(items.iter())
+            .filter_map(|&&i| {
+                if i % 2 == 0 {
+                    Some(i)
+                } else {
+                    None
+                }
+            });
+        test(it, &[0, 2, 4])
     }
 
     #[test]
