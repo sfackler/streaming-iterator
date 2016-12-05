@@ -231,6 +231,29 @@ pub trait StreamingIterator {
 
         None
     }
+
+    /// Creates an iterator which skips the first `n` elements.
+    #[inline]
+    fn skip(self, n: usize) -> Skip<Self>
+        where Self: Sized
+    {
+        Skip {
+            it: self,
+            n: n,
+        }
+    }
+
+    /// Creates an iterator which only returns the first `n` elements.
+    #[inline]
+    fn take(self, n: usize) -> Take<Self>
+        where Self: Sized
+    {
+        Take {
+            it: self,
+            n: n,
+            done: false,
+        }
+    }
 }
 
 impl<'a, I: ?Sized> StreamingIterator for &'a mut I
@@ -545,6 +568,63 @@ impl<I> Iterator for Owned<I>
     }
 }
 
+/// A streaming iterator which skips a number of elements in a streaming iterator.
+#[derive(Clone)]
+pub struct Skip<I> {
+    it: I,
+    n: usize,
+}
+
+impl<I> StreamingIterator for Skip<I>
+    where I: StreamingIterator
+{
+    type Item = I::Item;
+
+    #[inline]
+    fn advance(&mut self) {
+        self.it.nth(self.n);
+        self.n = 0;
+    }
+
+    #[inline]
+    fn get(&self) -> Option<&I::Item> {
+        self.it.get()
+    }
+}
+
+/// A streaming iterator which only yields a limited number of elements in a streaming iterator.
+#[derive(Clone)]
+pub struct Take<I> {
+    it: I,
+    n: usize,
+    done: bool,
+}
+
+impl<I> StreamingIterator for Take<I>
+    where I: StreamingIterator
+{
+    type Item = I::Item;
+
+    #[inline]
+    fn advance(&mut self) {
+        if self.n != 0 {
+            self.it.advance();
+            self.n -= 1;
+        } else {
+            self.done = true;
+        }
+    }
+
+    #[inline]
+    fn get(&self) -> Option<&I::Item> {
+        if self.done {
+            None
+        } else {
+            self.it.get()
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use core::fmt::Debug;
@@ -699,5 +779,23 @@ mod test {
         let it = convert(items.iter().cloned());
         assert_eq!(it.clone().position(|&x| x % 2 == 1), Some(1));
         assert_eq!(it.clone().position(|&x| x % 3 == 2), None);
+    }
+
+    #[test]
+    fn skip() {
+        let items = [0, 1, 2, 3];
+        let it = convert(items.iter().cloned());
+        test(it.clone().skip(0), &[0, 1, 2, 3]);
+        test(it.clone().skip(2), &[2, 3]);
+        test(it.clone().skip(5), &[]);
+    }
+
+    #[test]
+    fn take() {
+        let items = [0, 1, 2, 3];
+        let it = convert(items.iter().cloned());
+        test(it.clone().take(0), &[]);
+        test(it.clone().take(2), &[0, 1]);
+        test(it.clone().take(5), &[0, 1, 2, 3]);
     }
 }
