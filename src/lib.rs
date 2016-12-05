@@ -3,7 +3,7 @@
 //! The iterator APIs in the Rust standard library do not allow elements to be yielded which borrow
 //! from the iterator itself. That means, for example, that the `std::io::Lines` iterator must
 //! allocate a new `String` for each line rather than reusing an internal buffer. The
-//!`StreamingIterator` trait instead provides access to elements being iterated over only by
+//! `StreamingIterator` trait instead provides access to elements being iterated over only by
 //! reference rather than by value.
 //!
 //! `StreamingIterator`s cannot be used in Rust `for` loops, but `while let` loops offer a similar
@@ -126,10 +126,7 @@ pub trait StreamingIterator {
         where Self: Sized,
               F: FnMut(&Self::Item) -> bool
     {
-        Filter {
-            it: self,
-            f: f,
-        }
+        Filter { it: self, f: f }
     }
 
     /// Creates an iterator which both filters and maps by applying a closure to elements.
@@ -201,10 +198,7 @@ pub trait StreamingIterator {
         where Self: Sized,
               F: Fn(&Self::Item) -> &B
     {
-        MapRef {
-            it: self,
-            f: f,
-        }
+        MapRef { it: self, f: f }
     }
 
     /// Consumes the first `n` elements of the iterator, returning the next one.
@@ -254,10 +248,7 @@ pub trait StreamingIterator {
     fn skip(self, n: usize) -> Skip<Self>
         where Self: Sized
     {
-        Skip {
-            it: self,
-            n: n,
-        }
+        Skip { it: self, n: n }
     }
 
     /// Creates an iterator that skips initial elements matching a predicate.
@@ -736,11 +727,7 @@ impl<I> StreamingIterator for Take<I>
 
     #[inline]
     fn get(&self) -> Option<&I::Item> {
-        if self.done {
-            None
-        } else {
-            self.it.get()
-        }
+        if self.done { None } else { self.it.get() }
     }
 
     #[inline]
@@ -777,11 +764,7 @@ impl<I, F> StreamingIterator for TakeWhile<I, F>
 
     #[inline]
     fn get(&self) -> Option<&I::Item> {
-        if self.done {
-            None
-        } else {
-            self.it.get()
-        }
+        if self.done { None } else { self.it.get() }
     }
 
     #[inline]
@@ -798,7 +781,7 @@ impl<I, F> StreamingIterator for TakeWhile<I, F>
                         None
                     }
                 }
-                None => None
+                None => None,
             }
         }
     }
@@ -822,7 +805,7 @@ mod test {
 
     fn test<I>(mut it: I, expected: &[I::Item])
         where I: StreamingIterator,
-              I::Item: Sized + PartialEq + Debug,
+              I::Item: Sized + PartialEq + Debug
     {
         for item in expected {
             it.advance();
@@ -892,11 +875,7 @@ mod test {
             }
 
             fn get(&self) -> Option<&i32> {
-                if self.0 % 4 == 3 {
-                    None
-                } else {
-                    Some(&self.0)
-                }
+                if self.0 % 4 == 3 { None } else { Some(&self.0) }
             }
         }
 
@@ -946,13 +925,7 @@ mod test {
     fn filter_map() {
         let items = [0u8, 1, 1, 2, 4];
         let it = convert(items.iter())
-            .filter_map(|&&i| {
-                if i % 2 == 0 {
-                    Some(i)
-                } else {
-                    None
-                }
-            });
+            .filter_map(|&&i| { if i % 2 == 0 { Some(i) } else { None } });
         test(it, &[0, 2, 4])
     }
 
