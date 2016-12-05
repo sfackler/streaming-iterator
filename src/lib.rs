@@ -139,6 +139,18 @@ pub trait StreamingIterator {
         }
     }
 
+    /// Consumes the first `n` elements of the iterator, returning the next one.
+    #[inline]
+    fn nth(&mut self, n: usize) -> Option<&Self::Item> {
+        for _ in 0..n {
+            self.advance();
+            if self.get().is_none() {
+                return None;
+            }
+        }
+        self.next()
+    }
+
     /// Creates a normal, non-streaming, iterator with elements produced by calling `to_owned` on
     /// the elements of this iterator.
     ///
@@ -191,6 +203,7 @@ pub fn convert<I>(it: I) -> Convert<I>
 }
 
 /// A streaming iterator which yields elements from a normal, non-streaming, iterator.
+#[derive(Clone)]
 pub struct Convert<I>
     where I: Iterator
 {
@@ -298,6 +311,7 @@ impl<I, B, F> StreamingIterator for FilterMap<I, B, F>
     }
 }
 
+#[derive(Copy, Clone)]
 enum FuseState {
     Start,
     Middle,
@@ -305,6 +319,7 @@ enum FuseState {
 }
 
 /// A streaming iterator which is well-defined before and after iteration.
+#[derive(Clone)]
 pub struct Fuse<I> {
     it: I,
     state: FuseState,
@@ -419,6 +434,7 @@ impl<I, B, F> StreamingIterator for Map<I, B, F>
 ///
 /// Requires the `std` feature.
 #[cfg(feature = "std")]
+#[derive(Clone)]
 pub struct Owned<I>(I);
 
 #[cfg(feature = "std")]
@@ -521,6 +537,15 @@ mod test {
         let items = [0, 1];
         let it = convert(items.iter().map(|&i| i as usize)).map(|&i| i as i32);
         test(it, &items);
+    }
+
+    #[test]
+    fn nth() {
+        let items = [0, 1];
+        let it = convert(items.iter().cloned());
+        assert_eq!(it.clone().nth(0), Some(&0));
+        assert_eq!(it.clone().nth(1), Some(&1));
+        assert_eq!(it.clone().nth(2), None);
     }
 
     #[test]
