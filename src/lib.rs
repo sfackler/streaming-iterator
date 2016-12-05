@@ -65,6 +65,28 @@ pub trait StreamingIterator {
         (0, None)
     }
 
+    /// Determines if all elements of the iterator satisfy a predicate.
+    #[inline]
+    fn all<F>(&mut self, mut f: F) -> bool
+        where F: FnMut(&Self::Item) -> bool
+    {
+        while let Some(i) = self.next() {
+            if !f(i) {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    /// Determines if any elements of the iterator satisfy a predicate.
+    #[inline]
+    fn any<F>(&mut self, mut f: F) -> bool
+        where F: FnMut(&Self::Item) -> bool
+    {
+        !self.all(|i| !f(i))
+    }
+
     /// Borrows an iterator, rather than consuming it.
     ///
     /// This is useful to allow the application of iterator adaptors while still retaining ownership
@@ -473,6 +495,22 @@ mod test {
         it.advance();
         assert_eq!(it.get(), None);
         assert_eq!(it.get(), None);
+    }
+
+    #[test]
+    fn all() {
+        let items = [0, 1, 2];
+        let it = convert(items.iter().cloned());
+        assert!(it.clone().all(|&i| i < 3));
+        assert!(!it.clone().all(|&i| i % 2 == 0));
+    }
+
+    #[test]
+    fn any() {
+        let items = [0, 1, 2];
+        let it = convert(items.iter().cloned());
+        assert!(it.clone().any(|&i| i > 1));
+        assert!(!it.clone().any(|&i| i > 2));
     }
 
     #[test]
