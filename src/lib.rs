@@ -133,6 +133,26 @@ pub trait StreamingIterator {
         }
     }
 
+    /// Returns the first element of the iterator that satisfies the predicate.
+    #[inline]
+    fn find<F>(&mut self, mut f: F) -> Option<&Self::Item>
+        where F: FnMut(&Self::Item) -> bool
+    {
+        loop {
+            self.advance();
+            match self.get() {
+                Some(i) => {
+                    if f(i) {
+                        break;
+                    }
+                }
+                None => break,
+            }
+        }
+
+        (*self).get()
+    }
+
     /// Creates an iterator which is "well behaved" at the beginning and end of iteration
     ///
     /// The behavior of calling `get` before iteration has been started, and of continuing to call
@@ -598,6 +618,14 @@ mod test {
                 }
             });
         test(it, &[0, 2, 4])
+    }
+
+    #[test]
+    fn find() {
+        let items = [0, 1];
+        let it = convert(items.iter().cloned());
+        assert_eq!(it.clone().find(|&x| x % 2 == 1), Some(&1));
+        assert_eq!(it.clone().find(|&x| x % 3 == 2), None);
     }
 
     #[test]
