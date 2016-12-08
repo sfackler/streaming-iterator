@@ -162,7 +162,7 @@ pub trait StreamingIterator {
         (*self).get()
     }
 
-    /// Creates an iterator which is "well behaved" at the beginning and end of iteration
+    /// Creates an iterator which is "well behaved" at the beginning and end of iteration.
     ///
     /// The behavior of calling `get` before iteration has been started, and of continuing to call
     /// `advance` after `get` has returned `None` is normally unspecified, but this guarantees that
