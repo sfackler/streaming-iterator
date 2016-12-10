@@ -322,6 +322,33 @@ impl<'a, I: ?Sized> StreamingIterator for &'a mut I
     }
 }
 
+#[cfg(feature = "std")]
+impl<I: ?Sized> StreamingIterator for Box<I>
+    where I: StreamingIterator
+{
+    type Item = I::Item;
+
+    #[inline]
+    fn advance(&mut self) {
+        (**self).advance()
+    }
+
+    #[inline]
+    fn get(&self) -> Option<&Self::Item> {
+        (**self).get()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (**self).size_hint()
+    }
+
+    #[inline]
+    fn next(&mut self) -> Option<&Self::Item> {
+        (**self).next()
+    }
+}
+
 /// Turns a normal, non-streaming iterator into a streaming iterator.
 #[inline]
 pub fn convert<I>(it: I) -> Convert<I>
