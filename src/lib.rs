@@ -71,7 +71,8 @@ pub trait StreamingIterator {
     /// Determines if all elements of the iterator satisfy a predicate.
     #[inline]
     fn all<F>(&mut self, mut f: F) -> bool
-        where F: FnMut(&Self::Item) -> bool
+        where Self: Sized,
+              F: FnMut(&Self::Item) -> bool
     {
         while let Some(i) = self.next() {
             if !f(i) {
@@ -85,7 +86,8 @@ pub trait StreamingIterator {
     /// Determines if any elements of the iterator satisfy a predicate.
     #[inline]
     fn any<F>(&mut self, mut f: F) -> bool
-        where F: FnMut(&Self::Item) -> bool
+        where Self: Sized,
+              F: FnMut(&Self::Item) -> bool
     {
         !self.all(|i| !f(i))
     }
@@ -95,7 +97,9 @@ pub trait StreamingIterator {
     /// This is useful to allow the application of iterator adaptors while still retaining ownership
     /// of the original adaptor.
     #[inline]
-    fn by_ref(&mut self) -> &mut Self {
+    fn by_ref(&mut self) -> &mut Self
+        where Self: Sized
+    {
         self
     }
 
@@ -145,7 +149,8 @@ pub trait StreamingIterator {
     /// Returns the first element of the iterator that satisfies the predicate.
     #[inline]
     fn find<F>(&mut self, mut f: F) -> Option<&Self::Item>
-        where F: FnMut(&Self::Item) -> bool
+        where Self: Sized,
+              F: FnMut(&Self::Item) -> bool
     {
         loop {
             self.advance();
@@ -229,7 +234,8 @@ pub trait StreamingIterator {
     /// Returns the index of the first element of the iterator matching a predicate.
     #[inline]
     fn position<F>(&mut self, mut f: F) -> Option<usize>
-        where F: FnMut(&Self::Item) -> bool
+        where Self: Sized,
+              F: FnMut(&Self::Item) -> bool
     {
         let mut n = 0;
 
@@ -987,5 +993,8 @@ mod test {
         test(it.clone().take_while(|&i| i < 0), &[]);
         test(it.clone().take_while(|&i| i < 2), &[0, 1]);
         test(it.clone().take_while(|&i| i < 5), &[0, 1, 2, 3]);
+    }
+
+    fn _is_object_safe(_: &StreamingIterator<Item = ()>) {
     }
 }
