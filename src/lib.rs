@@ -23,7 +23,7 @@
 //! This is required because of Rust's lexical handling of borrows (more specifically a lack of
 //! single entry, multiple exit borrows). If `StreamingIterator` was defined like `Iterator` with
 //! just a required `next` method, operations like `filter` would be impossible to define.
-#![doc(html_root_url="https://docs.rs/streaming-iterator/0.1.1")]
+#![doc(html_root_url="https://docs.rs/streaming-iterator/0.1.2")]
 #![warn(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
