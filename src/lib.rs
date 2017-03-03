@@ -339,6 +339,18 @@ pub trait StreamingIterator {
     {
         self.fold((), move |(), item| f(item));
     }
+
+    /// Appends continues with another iterator when current reaches EOF.
+    #[inline]
+    fn chain<I: StreamingIterator<Item=Self::Item>>(self, it: I) -> Chain<Self, I>
+        where Self: Sized,
+    {
+        Chain {
+            it: self,
+            then: it,
+            done: false,
+        }
+    }
 }
 
 impl<'a, I: ?Sized> StreamingIterator for &'a mut I
@@ -1342,6 +1354,59 @@ where
     }
 }
 
+/// A streaming iterator which will continue with another operator when the first one finishes
+pub struct Chain<I, J> {
+    it: I,
+    then: J,
+    done: bool,
+}
+
+impl<I, J> StreamingIterator for Chain<I, J>
+    where I: StreamingIterator,
+          J: StreamingIterator<Item=I::Item>
+{
+    type Item = I::Item;
+
+    #[inline]
+    fn advance(&mut self) {
+        if !self.done {
+            self.it.advance();
+            if self.it.get().is_none() {
+                self.done = true;
+                self.then.advance();
+            }
+        } else {
+            self.then.advance();
+        }
+    }
+
+    #[inline]
+    fn get(&self) -> Option<&I::Item> {
+        if self.done {
+          self.then.get()
+        } else {
+          self.it.get()
+        }
+    }
+
+    #[inline]
+    fn next(&mut self) -> Option<&I::Item> {
+        if self.done {
+            self.then.next()
+        } else {
+            match self.it.next() {
+                Some(i) => {
+                    Some(i)
+                }
+                None => {
+                    self.done = true;
+                    self.then.next()
+                }
+            }
+        }
+    }
+}
+
 impl<I> DoubleEndedStreamingIterator for Rev<I>
 where
     I: DoubleEndedStreamingIterator,
@@ -1615,5 +1680,19 @@ mod test {
         let mut acc = 0;
         it.rev().for_each(|i| acc = acc * 10 + i);
         assert_eq!(acc, 3210);
+    }
+
+    #[test]
+    fn chain() {
+        let items = [0, 1, 2, 3];
+        let then = [4, 5, 6, 7];
+        let first = convert(items.iter().cloned());
+        let second = convert(then.iter().cloned());
+        test(first.chain(second).take(8), &[0, 1, 2, 3, 4, 5, 6, 7]);
+
+        let first = convert(items.iter().cloned());
+        let mut second = convert(then.iter().cloned());
+        second.next();
+        test(first.chain(second).take(8), &[0, 1, 2, 3, 5, 6, 7]);
     }
 }
