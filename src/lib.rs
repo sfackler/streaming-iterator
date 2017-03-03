@@ -30,6 +30,7 @@
 #[cfg(feature = "std")]
 extern crate core;
 
+use core::marker::PhantomData;
 use core::cmp;
 
 /// An interface for dealing with streaming iterators.
@@ -357,6 +358,30 @@ pub fn convert<I>(it: I) -> Convert<I>
     Convert {
         it: it,
         item: None,
+    }
+}
+
+/// A simple iterator that returns nothing
+#[derive(Clone)]
+pub struct Empty<I> {
+  phantom: PhantomData<I>,
+}
+
+impl<I> StreamingIterator for Empty<I> {
+    type Item = I;
+
+    fn advance(&mut self) {}
+
+    fn get(&self) -> Option<&Self::Item> {
+        None
+    }
+}
+
+/// Creates an empty iterator
+#[inline]
+pub fn empty<I>() -> Empty<I> {
+    Empty {
+      phantom: PhantomData,
     }
 }
 
@@ -1023,5 +1048,12 @@ mod test {
     }
 
     fn _is_object_safe(_: &StreamingIterator<Item = ()>) {
+    }
+
+    #[test]
+    fn empty_iterator() {
+      let mut it: Empty<u8> = empty();
+
+      assert_eq!(it.next(), None);
     }
 }
