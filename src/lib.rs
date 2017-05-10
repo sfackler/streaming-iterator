@@ -361,6 +361,17 @@ pub fn convert<I>(it: I) -> Convert<I>
     }
 }
 
+/// Turns an iterator of references into a streaming iterator.
+#[inline]
+pub fn convert_ref<'a, I, T: ?Sized>(iterator: I) -> ConvertRef<'a, I, T>
+    where I: Iterator<Item=&'a T>
+{
+    ConvertRef {
+        it: iterator,
+        item: None,
+    }
+}
+
 /// A simple iterator that returns nothing
 #[derive(Clone)]
 pub struct Empty<I> {
@@ -429,6 +440,41 @@ impl<I> StreamingIterator for Convert<I>
     #[inline]
     fn get(&self) -> Option<&I::Item> {
         self.item.as_ref()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.it.size_hint()
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        self.it.count()
+    }
+}
+
+/// A streaming iterator which yields elements from an iterator of references.
+#[derive(Clone)]
+pub struct ConvertRef<'a, I, T: ?Sized>
+    where I: Iterator<Item=&'a T>, T: 'a
+{
+    it: I,
+    item: Option<&'a T>,
+}
+
+impl<'a, I, T: ?Sized> StreamingIterator for ConvertRef<'a, I, T>
+    where I: Iterator<Item=&'a T>
+{
+    type Item = T;
+
+    #[inline]
+    fn advance(&mut self) {
+        self.item = self.it.next();
+    }
+
+    #[inline]
+    fn get(&self) -> Option<&T> {
+        self.item
     }
 
     #[inline]
@@ -904,6 +950,13 @@ mod test {
     fn test_convert() {
         let items = [0, 1];
         let it = convert(items.iter().cloned());
+        test(it, &items);
+    }
+
+    #[test]
+    fn test_convert_ref() {
+        let items = [&0, &1];
+        let it = convert_ref(items.iter());
         test(it, &items);
     }
 
