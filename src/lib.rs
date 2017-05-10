@@ -363,8 +363,8 @@ pub fn convert<I>(it: I) -> Convert<I>
 
 /// Turns an iterator of references into a streaming iterator.
 #[inline]
-pub fn convert_ref<'a, I, T>(iterator: I) -> ConvertRef<'a, I, T>
-    where I: Iterator<Item=&'a T>, T: ?Sized
+pub fn convert_ref<'a, I, T: ?Sized>(iterator: I) -> ConvertRef<'a, I, T>
+    where I: Iterator<Item=&'a T>
 {
     ConvertRef {
         it: iterator,
@@ -455,15 +455,15 @@ impl<I> StreamingIterator for Convert<I>
 
 /// A streaming iterator which yields elements from an iterator of references.
 #[derive(Clone)]
-pub struct ConvertRef<'a, I, T>
-    where I: Iterator<Item=&'a T>, T: 'a + ?Sized
+pub struct ConvertRef<'a, I, T: ?Sized>
+    where I: Iterator<Item=&'a T>, T: 'a
 {
     it: I,
     item: Option<&'a T>,
 }
 
-impl<'a, I, T> StreamingIterator for ConvertRef<'a, I, T>
-    where I: Iterator<Item=&'a T>, T: ?Sized
+impl<'a, I, T: ?Sized> StreamingIterator for ConvertRef<'a, I, T>
+    where I: Iterator<Item=&'a T>
 {
     type Item = T;
 
