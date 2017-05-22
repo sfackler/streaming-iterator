@@ -373,7 +373,7 @@ pub fn convert_ref<'a, I, T: ?Sized>(iterator: I) -> ConvertRef<'a, I, T>
 }
 
 /// A simple iterator that returns nothing
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Empty<I> {
   phantom: PhantomData<I>,
 }
@@ -398,7 +398,7 @@ pub fn empty<I>() -> Empty<I> {
 
 /// A normal, non-streaming, iterator which converts the elements of a streaming iterator into owned
 /// values by cloning them.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Cloned<I>(I);
 
 impl<I> Iterator for Cloned<I>
@@ -419,7 +419,7 @@ impl<I> Iterator for Cloned<I>
 }
 
 /// A streaming iterator which yields elements from a normal, non-streaming, iterator.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Convert<I>
     where I: Iterator
 {
@@ -454,7 +454,7 @@ impl<I> StreamingIterator for Convert<I>
 }
 
 /// A streaming iterator which yields elements from an iterator of references.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ConvertRef<'a, I, T: ?Sized>
     where I: Iterator<Item=&'a T>, T: 'a
 {
@@ -489,6 +489,7 @@ impl<'a, I, T: ?Sized> StreamingIterator for ConvertRef<'a, I, T>
 }
 
 /// A streaming iterator which filters the elements of a streaming iterator with a predicate.
+#[derive(Debug)]
 pub struct Filter<I, F> {
     it: I,
     f: F,
@@ -521,6 +522,7 @@ impl<I, F> StreamingIterator for Filter<I, F>
 }
 
 /// An iterator which both filters and maps elements of a streaming iterator with a closure.
+#[derive(Debug)]
 pub struct FilterMap<I, B, F> {
     it: I,
     f: F,
@@ -562,7 +564,7 @@ impl<I, B, F> StreamingIterator for FilterMap<I, B, F>
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 enum FuseState {
     Start,
     Middle,
@@ -570,7 +572,7 @@ enum FuseState {
 }
 
 /// A streaming iterator which is well-defined before and after iteration.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Fuse<I> {
     it: I,
     state: FuseState,
@@ -652,6 +654,7 @@ impl<I> StreamingIterator for Fuse<I>
 }
 
 /// A streaming iterator which transforms the elements of a streaming iterator.
+#[derive(Debug)]
 pub struct Map<I, B, F> {
     it: I,
     f: F,
@@ -681,6 +684,7 @@ impl<I, B, F> StreamingIterator for Map<I, B, F>
 }
 
 /// A streaming iterator which transforms the elements of a streaming iterator.
+#[derive(Debug)]
 pub struct MapRef<I, F> {
     it: I,
     f: F,
@@ -718,7 +722,7 @@ impl<I, B: ?Sized, F> StreamingIterator for MapRef<I, F>
 ///
 /// Requires the `std` feature.
 #[cfg(feature = "std")]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Owned<I>(I);
 
 #[cfg(feature = "std")]
@@ -740,7 +744,7 @@ impl<I> Iterator for Owned<I>
 }
 
 /// A streaming iterator which skips a number of elements in a streaming iterator.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Skip<I> {
     it: I,
     n: usize,
@@ -770,7 +774,7 @@ impl<I> StreamingIterator for Skip<I>
 }
 
 /// A streaming iterator which skips initial elements that match a predicate
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SkipWhile<I, F> {
     it: I,
     f: F,
@@ -807,7 +811,7 @@ impl<I, F> StreamingIterator for SkipWhile<I, F>
 }
 
 /// A streaming iterator which only yields a limited number of elements in a streaming iterator.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Take<I> {
     it: I,
     n: usize,
@@ -842,6 +846,7 @@ impl<I> StreamingIterator for Take<I>
 }
 
 /// A streaming iterator which only returns initial elements matching a predicate.
+#[derive(Debug)]
 pub struct TakeWhile<I, F> {
     it: I,
     f: F,
