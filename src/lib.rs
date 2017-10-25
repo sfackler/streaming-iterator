@@ -23,7 +23,7 @@
 //! This is required because of Rust's lexical handling of borrows (more specifically a lack of
 //! single entry, multiple exit borrows). If `StreamingIterator` was defined like `Iterator` with
 //! just a required `next` method, operations like `filter` would be impossible to define.
-#![doc(html_root_url="https://docs.rs/streaming-iterator/0.1.2")]
+#![doc(html_root_url = "https://docs.rs/streaming-iterator/0.1.2")]
 #![warn(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -72,8 +72,9 @@ pub trait StreamingIterator {
     /// Determines if all elements of the iterator satisfy a predicate.
     #[inline]
     fn all<F>(&mut self, mut f: F) -> bool
-        where Self: Sized,
-              F: FnMut(&Self::Item) -> bool
+    where
+        Self: Sized,
+        F: FnMut(&Self::Item) -> bool,
     {
         while let Some(i) = self.next() {
             if !f(i) {
@@ -87,8 +88,9 @@ pub trait StreamingIterator {
     /// Determines if any elements of the iterator satisfy a predicate.
     #[inline]
     fn any<F>(&mut self, mut f: F) -> bool
-        where Self: Sized,
-              F: FnMut(&Self::Item) -> bool
+    where
+        Self: Sized,
+        F: FnMut(&Self::Item) -> bool,
     {
         !self.all(|i| !f(i))
     }
@@ -99,7 +101,8 @@ pub trait StreamingIterator {
     /// of the original adaptor.
     #[inline]
     fn by_ref(&mut self) -> &mut Self
-        where Self: Sized
+    where
+        Self: Sized,
     {
         self
     }
@@ -107,8 +110,9 @@ pub trait StreamingIterator {
     /// Produces a normal, non-streaming, iterator by cloning the elements of this iterator.
     #[inline]
     fn cloned(self) -> Cloned<Self>
-        where Self: Sized,
-              Self::Item: Clone
+    where
+        Self: Sized,
+        Self::Item: Clone,
     {
         Cloned(self)
     }
@@ -116,7 +120,8 @@ pub trait StreamingIterator {
     /// Consumes the iterator, counting the number of remaining elements and returning it.
     #[inline]
     fn count(mut self) -> usize
-        where Self: Sized
+    where
+        Self: Sized,
     {
         let mut count = 0;
         while let Some(_) = self.next() {
@@ -128,8 +133,9 @@ pub trait StreamingIterator {
     /// Creates an iterator which uses a closure to determine if an element should be yielded.
     #[inline]
     fn filter<F>(self, f: F) -> Filter<Self, F>
-        where Self: Sized,
-              F: FnMut(&Self::Item) -> bool
+    where
+        Self: Sized,
+        F: FnMut(&Self::Item) -> bool,
     {
         Filter { it: self, f: f }
     }
@@ -137,8 +143,9 @@ pub trait StreamingIterator {
     /// Creates an iterator which both filters and maps by applying a closure to elements.
     #[inline]
     fn filter_map<B, F>(self, f: F) -> FilterMap<Self, B, F>
-        where Self: Sized,
-              F: FnMut(&Self::Item) -> Option<B>
+    where
+        Self: Sized,
+        F: FnMut(&Self::Item) -> Option<B>,
     {
         FilterMap {
             it: self,
@@ -150,17 +157,16 @@ pub trait StreamingIterator {
     /// Returns the first element of the iterator that satisfies the predicate.
     #[inline]
     fn find<F>(&mut self, mut f: F) -> Option<&Self::Item>
-        where Self: Sized,
-              F: FnMut(&Self::Item) -> bool
+    where
+        Self: Sized,
+        F: FnMut(&Self::Item) -> bool,
     {
         loop {
             self.advance();
             match self.get() {
-                Some(i) => {
-                    if f(i) {
-                        break;
-                    }
-                }
+                Some(i) => if f(i) {
+                    break;
+                },
                 None => break,
             }
         }
@@ -175,7 +181,8 @@ pub trait StreamingIterator {
     /// `get` will return `None` in both cases.
     #[inline]
     fn fuse(self) -> Fuse<Self>
-        where Self: Sized
+    where
+        Self: Sized,
     {
         Fuse {
             it: self,
@@ -186,8 +193,9 @@ pub trait StreamingIterator {
     /// Creates an iterator which transforms elements of this iterator by passing them to a closure.
     #[inline]
     fn map<B, F>(self, f: F) -> Map<Self, B, F>
-        where Self: Sized,
-              F: FnMut(&Self::Item) -> B
+    where
+        Self: Sized,
+        F: FnMut(&Self::Item) -> B,
     {
         Map {
             it: self,
@@ -201,8 +209,9 @@ pub trait StreamingIterator {
     /// Unlike `map`, this method takes a closure that returns a reference into the original value.
     #[inline]
     fn map_ref<B: ?Sized, F>(self, f: F) -> MapRef<Self, F>
-        where Self: Sized,
-              F: Fn(&Self::Item) -> &B
+    where
+        Self: Sized,
+        F: Fn(&Self::Item) -> &B,
     {
         MapRef { it: self, f: f }
     }
@@ -226,8 +235,9 @@ pub trait StreamingIterator {
     #[cfg(feature = "std")]
     #[inline]
     fn owned(self) -> Owned<Self>
-        where Self: Sized,
-              Self::Item: ToOwned
+    where
+        Self: Sized,
+        Self::Item: ToOwned,
     {
         Owned(self)
     }
@@ -235,8 +245,9 @@ pub trait StreamingIterator {
     /// Returns the index of the first element of the iterator matching a predicate.
     #[inline]
     fn position<F>(&mut self, mut f: F) -> Option<usize>
-        where Self: Sized,
-              F: FnMut(&Self::Item) -> bool
+    where
+        Self: Sized,
+        F: FnMut(&Self::Item) -> bool,
     {
         let mut n = 0;
 
@@ -253,7 +264,8 @@ pub trait StreamingIterator {
     /// Creates an iterator which skips the first `n` elements.
     #[inline]
     fn skip(self, n: usize) -> Skip<Self>
-        where Self: Sized
+    where
+        Self: Sized,
     {
         Skip { it: self, n: n }
     }
@@ -261,8 +273,9 @@ pub trait StreamingIterator {
     /// Creates an iterator that skips initial elements matching a predicate.
     #[inline]
     fn skip_while<F>(self, f: F) -> SkipWhile<Self, F>
-        where Self: Sized,
-              F: FnMut(&Self::Item) -> bool
+    where
+        Self: Sized,
+        F: FnMut(&Self::Item) -> bool,
     {
         SkipWhile {
             it: self,
@@ -274,7 +287,8 @@ pub trait StreamingIterator {
     /// Creates an iterator which only returns the first `n` elements.
     #[inline]
     fn take(self, n: usize) -> Take<Self>
-        where Self: Sized
+    where
+        Self: Sized,
     {
         Take {
             it: self,
@@ -286,8 +300,9 @@ pub trait StreamingIterator {
     /// Creates an iterator which only returns initial elements matching a predicate.
     #[inline]
     fn take_while<F>(self, f: F) -> TakeWhile<Self, F>
-        where Self: Sized,
-              F: FnMut(&Self::Item) -> bool
+    where
+        Self: Sized,
+        F: FnMut(&Self::Item) -> bool,
     {
         TakeWhile {
             it: self,
@@ -295,10 +310,20 @@ pub trait StreamingIterator {
             done: false,
         }
     }
+
+    /// Creates an iterator which returns elemens in the opposite order.
+    #[inline]
+    fn rev(self) -> Rev<Self>
+    where
+        Self: Sized + DoubleEndedStreamingIterator,
+    {
+        Rev(self)
+    }
 }
 
 impl<'a, I: ?Sized> StreamingIterator for &'a mut I
-    where I: StreamingIterator
+where
+    I: StreamingIterator,
 {
     type Item = I::Item;
 
@@ -325,7 +350,8 @@ impl<'a, I: ?Sized> StreamingIterator for &'a mut I
 
 #[cfg(feature = "std")]
 impl<I: ?Sized> StreamingIterator for Box<I>
-    where I: StreamingIterator
+where
+    I: StreamingIterator,
 {
     type Item = I::Item;
 
@@ -350,21 +376,42 @@ impl<I: ?Sized> StreamingIterator for Box<I>
     }
 }
 
+/// A streaming iterator able to yield elements from both ends.
+pub trait DoubleEndedStreamingIterator: StreamingIterator {
+    /// Advances the iterator to the next element from the back of the iterator.
+    ///
+    /// Double ended iterators just after the last element, so this should be called before `get`
+    /// when iterating in reverse.
+    ///
+    /// The behavior of calling this method after the iterator has been exhausted is unspecified.
+    fn advance_back(&mut self);
+
+    /// Advances the iterator and returns the next value from the back.
+    ///
+    /// The behavior of calling this method after the iterator has been exhausted is unspecified.
+    ///
+    /// The default implementation simply calls `advance_back` followed by `get`.
+    #[inline]
+    fn next_back(&mut self) -> Option<&Self::Item> {
+        self.advance_back();
+        (*self).get()
+    }
+}
+
 /// Turns a normal, non-streaming iterator into a streaming iterator.
 #[inline]
 pub fn convert<I>(it: I) -> Convert<I>
-    where I: Iterator
+where
+    I: Iterator,
 {
-    Convert {
-        it: it,
-        item: None,
-    }
+    Convert { it: it, item: None }
 }
 
 /// Turns an iterator of references into a streaming iterator.
 #[inline]
 pub fn convert_ref<'a, I, T: ?Sized>(iterator: I) -> ConvertRef<'a, I, T>
-    where I: Iterator<Item=&'a T>
+where
+    I: Iterator<Item = &'a T>,
 {
     ConvertRef {
         it: iterator,
@@ -375,24 +422,31 @@ pub fn convert_ref<'a, I, T: ?Sized>(iterator: I) -> ConvertRef<'a, I, T>
 /// A simple iterator that returns nothing
 #[derive(Clone, Debug)]
 pub struct Empty<I> {
-  phantom: PhantomData<I>,
+    phantom: PhantomData<I>,
 }
 
 impl<I> StreamingIterator for Empty<I> {
     type Item = I;
 
+    #[inline]
     fn advance(&mut self) {}
 
+    #[inline]
     fn get(&self) -> Option<&Self::Item> {
         None
     }
+}
+
+impl<I> DoubleEndedStreamingIterator for Empty<I> {
+    #[inline]
+    fn advance_back(&mut self) {}
 }
 
 /// Creates an empty iterator
 #[inline]
 pub fn empty<I>() -> Empty<I> {
     Empty {
-      phantom: PhantomData,
+        phantom: PhantomData,
     }
 }
 
@@ -402,8 +456,9 @@ pub fn empty<I>() -> Empty<I> {
 pub struct Cloned<I>(I);
 
 impl<I> Iterator for Cloned<I>
-    where I: StreamingIterator,
-          I::Item: Clone
+where
+    I: StreamingIterator,
+    I::Item: Clone,
 {
     type Item = I::Item;
 
@@ -418,17 +473,30 @@ impl<I> Iterator for Cloned<I>
     }
 }
 
+impl<I> DoubleEndedIterator for Cloned<I>
+where
+    I: DoubleEndedStreamingIterator,
+    I::Item: Clone,
+{
+    #[inline]
+    fn next_back(&mut self) -> Option<I::Item> {
+        self.0.next_back().map(Clone::clone)
+    }
+}
+
 /// A streaming iterator which yields elements from a normal, non-streaming, iterator.
 #[derive(Clone, Debug)]
 pub struct Convert<I>
-    where I: Iterator
+where
+    I: Iterator,
 {
     it: I,
     item: Option<I::Item>,
 }
 
 impl<I> StreamingIterator for Convert<I>
-    where I: Iterator
+where
+    I: Iterator,
 {
     type Item = I::Item;
 
@@ -453,17 +521,30 @@ impl<I> StreamingIterator for Convert<I>
     }
 }
 
+impl<I> DoubleEndedStreamingIterator for Convert<I>
+where
+    I: DoubleEndedIterator,
+{
+    #[inline]
+    fn advance_back(&mut self) {
+        self.item = self.it.next_back();
+    }
+}
+
 /// A streaming iterator which yields elements from an iterator of references.
 #[derive(Clone, Debug)]
 pub struct ConvertRef<'a, I, T: ?Sized>
-    where I: Iterator<Item=&'a T>, T: 'a
+where
+    I: Iterator<Item = &'a T>,
+    T: 'a,
 {
     it: I,
     item: Option<&'a T>,
 }
 
 impl<'a, I, T: ?Sized> StreamingIterator for ConvertRef<'a, I, T>
-    where I: Iterator<Item=&'a T>
+where
+    I: Iterator<Item = &'a T>,
 {
     type Item = T;
 
@@ -488,6 +569,16 @@ impl<'a, I, T: ?Sized> StreamingIterator for ConvertRef<'a, I, T>
     }
 }
 
+impl<'a, I, T: ?Sized> DoubleEndedStreamingIterator for ConvertRef<'a, I, T>
+where
+    I: DoubleEndedIterator<Item = &'a T>,
+{
+    #[inline]
+    fn advance_back(&mut self) {
+        self.item = self.it.next_back();
+    }
+}
+
 /// A streaming iterator which filters the elements of a streaming iterator with a predicate.
 #[derive(Debug)]
 pub struct Filter<I, F> {
@@ -496,8 +587,9 @@ pub struct Filter<I, F> {
 }
 
 impl<I, F> StreamingIterator for Filter<I, F>
-    where I: StreamingIterator,
-          F: FnMut(&I::Item) -> bool
+where
+    I: StreamingIterator,
+    F: FnMut(&I::Item) -> bool,
 {
     type Item = I::Item;
 
@@ -521,6 +613,21 @@ impl<I, F> StreamingIterator for Filter<I, F>
     }
 }
 
+impl<I, F> DoubleEndedStreamingIterator for Filter<I, F>
+where
+    I: DoubleEndedStreamingIterator,
+    F: FnMut(&I::Item) -> bool,
+{
+    #[inline]
+    fn advance_back(&mut self) {
+        while let Some(i) = self.it.next_back() {
+            if (self.f)(i) {
+                break;
+            }
+        }
+    }
+}
+
 /// An iterator which both filters and maps elements of a streaming iterator with a closure.
 #[derive(Debug)]
 pub struct FilterMap<I, B, F> {
@@ -530,8 +637,9 @@ pub struct FilterMap<I, B, F> {
 }
 
 impl<I, B, F> StreamingIterator for FilterMap<I, B, F>
-    where I: StreamingIterator,
-          F: FnMut(&I::Item) -> Option<B>
+where
+    I: StreamingIterator,
+    F: FnMut(&I::Item) -> Option<B>,
 {
     type Item = B;
 
@@ -539,12 +647,10 @@ impl<I, B, F> StreamingIterator for FilterMap<I, B, F>
     fn advance(&mut self) {
         loop {
             match self.it.next() {
-                Some(i) => {
-                    if let Some(i) = (self.f)(i) {
-                        self.item = Some(i);
-                        break;
-                    }
-                }
+                Some(i) => if let Some(i) = (self.f)(i) {
+                    self.item = Some(i);
+                    break;
+                },
                 None => {
                     self.item = None;
                     break;
@@ -564,6 +670,28 @@ impl<I, B, F> StreamingIterator for FilterMap<I, B, F>
     }
 }
 
+impl<I, B, F> DoubleEndedStreamingIterator for FilterMap<I, B, F>
+where
+    I: DoubleEndedStreamingIterator,
+    F: FnMut(&I::Item) -> Option<B>,
+{
+    #[inline]
+    fn advance_back(&mut self) {
+        loop {
+            match self.it.next_back() {
+                Some(i) => if let Some(i) = (self.f)(i) {
+                    self.item = Some(i);
+                    break;
+                },
+                None => {
+                    self.item = None;
+                    break;
+                }
+            }
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 enum FuseState {
     Start,
@@ -579,7 +707,8 @@ pub struct Fuse<I> {
 }
 
 impl<I> StreamingIterator for Fuse<I>
-    where I: StreamingIterator
+where
+    I: StreamingIterator,
 {
     type Item = I::Item;
 
@@ -619,27 +748,23 @@ impl<I> StreamingIterator for Fuse<I>
     #[inline]
     fn next(&mut self) -> Option<&I::Item> {
         match self.state {
-            FuseState::Start => {
-                match self.it.next() {
-                    Some(i) => {
-                        self.state = FuseState::Middle;
-                        Some(i)
-                    }
-                    None => {
-                        self.state = FuseState::End;
-                        None
-                    }
+            FuseState::Start => match self.it.next() {
+                Some(i) => {
+                    self.state = FuseState::Middle;
+                    Some(i)
                 }
-            }
-            FuseState::Middle => {
-                match self.it.next() {
-                    Some(i) => Some(i),
-                    None => {
-                        self.state = FuseState::End;
-                        None
-                    }
+                None => {
+                    self.state = FuseState::End;
+                    None
                 }
-            }
+            },
+            FuseState::Middle => match self.it.next() {
+                Some(i) => Some(i),
+                None => {
+                    self.state = FuseState::End;
+                    None
+                }
+            },
             FuseState::End => None,
         }
     }
@@ -662,8 +787,9 @@ pub struct Map<I, B, F> {
 }
 
 impl<I, B, F> StreamingIterator for Map<I, B, F>
-    where I: StreamingIterator,
-          F: FnMut(&I::Item) -> B
+where
+    I: StreamingIterator,
+    F: FnMut(&I::Item) -> B,
 {
     type Item = B;
 
@@ -683,6 +809,17 @@ impl<I, B, F> StreamingIterator for Map<I, B, F>
     }
 }
 
+impl<I, B, F> DoubleEndedStreamingIterator for Map<I, B, F>
+where
+    I: DoubleEndedStreamingIterator,
+    F: FnMut(&I::Item) -> B,
+{
+    #[inline]
+    fn advance_back(&mut self) {
+        self.item = self.it.next_back().map(&mut self.f);
+    }
+}
+
 /// A streaming iterator which transforms the elements of a streaming iterator.
 #[derive(Debug)]
 pub struct MapRef<I, F> {
@@ -691,8 +828,9 @@ pub struct MapRef<I, F> {
 }
 
 impl<I, B: ?Sized, F> StreamingIterator for MapRef<I, F>
-    where I: StreamingIterator,
-          F: Fn(&I::Item) -> &B
+where
+    I: StreamingIterator,
+    F: Fn(&I::Item) -> &B,
 {
     type Item = B;
 
@@ -727,8 +865,9 @@ pub struct Owned<I>(I);
 
 #[cfg(feature = "std")]
 impl<I> Iterator for Owned<I>
-    where I: StreamingIterator,
-          I::Item: Sized + ToOwned
+where
+    I: StreamingIterator,
+    I::Item: Sized + ToOwned,
 {
     type Item = <I::Item as ToOwned>::Owned;
 
@@ -743,6 +882,18 @@ impl<I> Iterator for Owned<I>
     }
 }
 
+#[cfg(feature = "std")]
+impl<I> DoubleEndedIterator for Owned<I>
+where
+    I: DoubleEndedStreamingIterator,
+    I::Item: Sized + ToOwned,
+{
+    #[inline]
+    fn next_back(&mut self) -> Option<<I::Item as ToOwned>::Owned> {
+        self.0.next_back().map(ToOwned::to_owned)
+    }
+}
+
 /// A streaming iterator which skips a number of elements in a streaming iterator.
 #[derive(Clone, Debug)]
 pub struct Skip<I> {
@@ -751,7 +902,8 @@ pub struct Skip<I> {
 }
 
 impl<I> StreamingIterator for Skip<I>
-    where I: StreamingIterator
+where
+    I: StreamingIterator,
 {
     type Item = I::Item;
 
@@ -769,7 +921,10 @@ impl<I> StreamingIterator for Skip<I>
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let hint = self.it.size_hint();
-        (hint.0.saturating_sub(self.n), hint.1.map(|n| n.saturating_sub(self.n)))
+        (
+            hint.0.saturating_sub(self.n),
+            hint.1.map(|n| n.saturating_sub(self.n)),
+        )
     }
 }
 
@@ -782,8 +937,9 @@ pub struct SkipWhile<I, F> {
 }
 
 impl<I, F> StreamingIterator for SkipWhile<I, F>
-    where I: StreamingIterator,
-          F: FnMut(&I::Item) -> bool
+where
+    I: StreamingIterator,
+    F: FnMut(&I::Item) -> bool,
 {
     type Item = I::Item;
 
@@ -819,7 +975,8 @@ pub struct Take<I> {
 }
 
 impl<I> StreamingIterator for Take<I>
-    where I: StreamingIterator
+where
+    I: StreamingIterator,
 {
     type Item = I::Item;
 
@@ -835,7 +992,11 @@ impl<I> StreamingIterator for Take<I>
 
     #[inline]
     fn get(&self) -> Option<&I::Item> {
-        if self.done { None } else { self.it.get() }
+        if self.done {
+            None
+        } else {
+            self.it.get()
+        }
     }
 
     #[inline]
@@ -854,8 +1015,9 @@ pub struct TakeWhile<I, F> {
 }
 
 impl<I, F> StreamingIterator for TakeWhile<I, F>
-    where I: StreamingIterator,
-          F: FnMut(&I::Item) -> bool
+where
+    I: StreamingIterator,
+    F: FnMut(&I::Item) -> bool,
 {
     type Item = I::Item;
 
@@ -873,7 +1035,11 @@ impl<I, F> StreamingIterator for TakeWhile<I, F>
 
     #[inline]
     fn get(&self) -> Option<&I::Item> {
-        if self.done { None } else { self.it.get() }
+        if self.done {
+            None
+        } else {
+            self.it.get()
+        }
     }
 
     #[inline]
@@ -882,14 +1048,12 @@ impl<I, F> StreamingIterator for TakeWhile<I, F>
             None
         } else {
             match self.it.next() {
-                Some(i) => {
-                    if (self.f)(i) {
-                        Some(i)
-                    } else {
-                        self.done = true;
-                        None
-                    }
-                }
+                Some(i) => if (self.f)(i) {
+                    Some(i)
+                } else {
+                    self.done = true;
+                    None
+                },
                 None => None,
             }
         }
@@ -906,6 +1070,51 @@ impl<I, F> StreamingIterator for TakeWhile<I, F>
     }
 }
 
+/// A streaming iterator which returns elements in the opposite order.
+pub struct Rev<I>(I);
+
+impl<I> StreamingIterator for Rev<I>
+where
+    I: DoubleEndedStreamingIterator,
+{
+    type Item = I::Item;
+
+    #[inline]
+    fn advance(&mut self) {
+        self.0.advance_back();
+    }
+
+    #[inline]
+    fn get(&self) -> Option<&I::Item> {
+        self.0.get()
+    }
+
+    #[inline]
+    fn next(&mut self) -> Option<&I::Item> {
+        self.0.next_back()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
+
+impl<I> DoubleEndedStreamingIterator for Rev<I>
+where
+    I: DoubleEndedStreamingIterator,
+{
+    #[inline]
+    fn advance_back(&mut self) {
+        self.0.advance();
+    }
+
+    #[inline]
+    fn next_back(&mut self) -> Option<&I::Item> {
+        self.0.next()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use core::fmt::Debug;
@@ -913,8 +1122,9 @@ mod test {
     use super::*;
 
     fn test<I>(mut it: I, expected: &[I::Item])
-        where I: StreamingIterator,
-              I::Item: Sized + PartialEq + Debug
+    where
+        I: StreamingIterator,
+        I::Item: Sized + PartialEq + Debug,
     {
         for item in expected {
             it.advance();
@@ -991,7 +1201,11 @@ mod test {
             }
 
             fn get(&self) -> Option<&i32> {
-                if self.0 % 4 == 3 { None } else { Some(&self.0) }
+                if self.0 % 4 == 3 {
+                    None
+                } else {
+                    Some(&self.0)
+                }
             }
         }
 
@@ -1040,8 +1254,7 @@ mod test {
     #[test]
     fn filter_map() {
         let items = [0u8, 1, 1, 2, 4];
-        let it = convert(items.iter())
-            .filter_map(|&&i| { if i % 2 == 0 { Some(i) } else { None } });
+        let it = convert(items.iter()).filter_map(|&&i| if i % 2 == 0 { Some(i) } else { None });
         test(it, &[0, 2, 4])
     }
 
@@ -1105,13 +1318,19 @@ mod test {
         test(it.clone().take_while(|&i| i < 5), &[0, 1, 2, 3]);
     }
 
-    fn _is_object_safe(_: &StreamingIterator<Item = ()>) {
-    }
+    fn _is_object_safe(_: &StreamingIterator<Item = ()>) {}
 
     #[test]
     fn empty_iterator() {
-      let mut it: Empty<u8> = empty();
+        let mut it: Empty<u8> = empty();
 
-      assert_eq!(it.next(), None);
+        assert_eq!(it.next(), None);
+    }
+
+    #[test]
+    fn rev() {
+        let items = [0, 1, 2, 3];
+        let it = convert(items.iter().cloned());
+        test(it.clone().rev(), &[3, 2, 1, 0]);
     }
 }
