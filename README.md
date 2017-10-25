@@ -1,8 +1,8 @@
 # streaming-iterator
 
-[![Build Status](https://travis-ci.org/sfackler/streaming-iterator.svg?branch=master)](https://travis-ci.org/sfackler/streaming-iterator)
+[![CircleCI](https://circleci.com/gh/sfackler/streaming-iterator.svg?style=badge)](https://circleci.com/gh/sfackler/streaming-iterator)
 
-[Documentation](https://docs.rs/streaming-iterator/0.1.2/streaming_iterator)
+[Documentation](https://docs.rs/streaming-iterator)
 
 Streaming iterators for Rust.
 
