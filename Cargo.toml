@@ -1,11 +1,10 @@
 [package]
 name = "streaming-iterator"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Steven Fackler <sfackler@gmail.com>"]
 license = "MIT/Apache-2.0"
 description = "Streaming iterators"
 repository = "https://github.com/sfackler/streaming-iterator"
-documentation = "https://docs.rs/streaming-iterator/0.1.2/streaming_iterator"
 readme = "README.md"
 
 [features]
