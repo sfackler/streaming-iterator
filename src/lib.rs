@@ -962,6 +962,16 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.it.size_hint()
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it.fold(init, move |acc, item| fold(acc, &f(item)))
+    }
 }
 
 impl<I, B, F> DoubleEndedStreamingIterator for Map<I, B, F>
@@ -972,6 +982,16 @@ where
     #[inline]
     fn advance_back(&mut self) {
         self.item = self.it.next_back().map(&mut self.f);
+    }
+
+    #[inline]
+    fn rfold<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it.rfold(init, move |acc, item| fold(acc, &f(item)))
     }
 }
 
@@ -1007,6 +1027,16 @@ where
     #[inline]
     fn next(&mut self) -> Option<&B> {
         self.it.next().map(&self.f)
+    }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let f = self.f;
+        self.it.fold(init, move |acc, item| fold(acc, f(item)))
     }
 }
 
