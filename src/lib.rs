@@ -1132,6 +1132,15 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.0.size_hint()
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        self.0.rfold(init, f)
+    }
 }
 
 impl<I> DoubleEndedStreamingIterator for Rev<I>
@@ -1146,6 +1155,15 @@ where
     #[inline]
     fn next_back(&mut self) -> Option<&I::Item> {
         self.0.next()
+    }
+
+    #[inline]
+    fn rfold<Acc, Fold>(self, init: Acc, f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        self.0.fold(init, f)
     }
 }
 
