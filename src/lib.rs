@@ -919,6 +919,18 @@ where
             FuseState::End => 0,
         }
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        match self.state {
+            FuseState::Start | FuseState::Middle => self.it.fold(init, fold),
+            FuseState::End => init,
+        }
+    }
 }
 
 /// A streaming iterator which transforms the elements of a streaming iterator.
