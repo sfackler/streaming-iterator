@@ -119,15 +119,11 @@ pub trait StreamingIterator {
 
     /// Consumes the iterator, counting the number of remaining elements and returning it.
     #[inline]
-    fn count(mut self) -> usize
+    fn count(self) -> usize
     where
         Self: Sized,
     {
-        let mut count = 0;
-        while let Some(_) = self.next() {
-            count += 1;
-        }
-        count
+        self.fold(0, |count, _| count + 1)
     }
 
     /// Creates an iterator which uses a closure to determine if an element should be yielded.
@@ -318,6 +314,30 @@ pub trait StreamingIterator {
         Self: Sized + DoubleEndedStreamingIterator,
     {
         Rev(self)
+    }
+
+    /// Reduces the iterator's elements to a single, final value.
+    #[inline]
+    fn fold<B, F>(mut self, init: B, mut f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, &Self::Item) -> B,
+    {
+        let mut acc = init;
+        while let Some(item) = self.next() {
+            acc = f(acc, item);
+        }
+        acc
+    }
+
+    /// Calls a closure on each element of an iterator.
+    #[inline]
+    fn for_each<F>(self, mut f: F)
+    where
+        Self: Sized,
+        F: FnMut(&Self::Item),
+    {
+        self.fold((), move |(), item| f(item));
     }
 }
 
@@ -1332,5 +1352,21 @@ mod test {
         let items = [0, 1, 2, 3];
         let it = convert(items.iter().cloned());
         test(it.clone().rev(), &[3, 2, 1, 0]);
+    }
+
+    #[test]
+    fn fold() {
+        let items = [0, 1, 2, 3];
+        let it = convert(items.iter().cloned());
+        assert_eq!(it.fold(0, |acc, i| acc * 10 + i), 123);
+    }
+
+    #[test]
+    fn for_each() {
+        let items = [0, 1, 2, 3];
+        let it = convert(items.iter().cloned());
+        let mut acc = 0;
+        it.for_each(|i| acc = acc * 10 + i);
+        assert_eq!(acc, 123);
     }
 }
