@@ -505,6 +505,15 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.0.size_hint()
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, Self::Item) -> Acc,
+    {
+        self.0.fold(init, move |acc, item| f(acc, item.clone()))
+    }
 }
 
 impl<I> DoubleEndedIterator for Cloned<I>
@@ -913,6 +922,15 @@ where
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.0.size_hint()
+    }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, Self::Item) -> Acc,
+    {
+        self.0.fold(init, move |acc, item| f(acc, item.to_owned()))
     }
 }
 
