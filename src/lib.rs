@@ -690,6 +690,25 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         (0, self.it.size_hint().1)
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it.fold(
+            init,
+            move |acc, item| {
+                if f(item) {
+                    fold(acc, item)
+                } else {
+                    acc
+                }
+            },
+        )
+    }
 }
 
 impl<I, F> DoubleEndedStreamingIterator for Filter<I, F>
@@ -704,6 +723,25 @@ where
                 break;
             }
         }
+    }
+
+    #[inline]
+    fn rfold<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it.rfold(
+            init,
+            move |acc, item| {
+                if f(item) {
+                    fold(acc, item)
+                } else {
+                    acc
+                }
+            },
+        )
     }
 }
 
@@ -747,6 +785,19 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         (0, self.it.size_hint().1)
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it.fold(init, move |acc, item| match f(item) {
+            Some(item) => fold(acc, &item),
+            None => acc,
+        })
+    }
 }
 
 impl<I, B, F> DoubleEndedStreamingIterator for FilterMap<I, B, F>
@@ -768,6 +819,19 @@ where
                 }
             }
         }
+    }
+
+    #[inline]
+    fn rfold<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it.rfold(init, move |acc, item| match f(item) {
+            Some(item) => fold(acc, &item),
+            None => acc,
+        })
     }
 }
 
