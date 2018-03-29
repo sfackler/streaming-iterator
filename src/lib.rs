@@ -416,6 +416,20 @@ pub trait DoubleEndedStreamingIterator: StreamingIterator {
         self.advance_back();
         (*self).get()
     }
+
+    /// Reduces the iterator's elements to a single, final value, starting from the back.
+    #[inline]
+    fn rfold<B, F>(mut self, init: B, mut f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, &Self::Item) -> B,
+    {
+        let mut acc = init;
+        while let Some(item) = self.next_back() {
+            acc = f(acc, item);
+        }
+        acc
+    }
 }
 
 /// Turns a normal, non-streaming iterator into a streaming iterator.
@@ -1368,5 +1382,21 @@ mod test {
         let mut acc = 0;
         it.for_each(|i| acc = acc * 10 + i);
         assert_eq!(acc, 123);
+    }
+
+    #[test]
+    fn rfold() {
+        let items = [0, 1, 2, 3];
+        let it = convert(items.iter().cloned());
+        assert_eq!(it.rfold(0, |acc, i| acc * 10 + i), 3210);
+    }
+
+    #[test]
+    fn for_each_rev() {
+        let items = [0, 1, 2, 3];
+        let it = convert(items.iter().cloned());
+        let mut acc = 0;
+        it.rev().for_each(|i| acc = acc * 10 + i);
+        assert_eq!(acc, 3210);
     }
 }
