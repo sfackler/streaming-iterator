@@ -30,8 +30,8 @@
 #[cfg(feature = "std")]
 extern crate core;
 
-use core::marker::PhantomData;
 use core::cmp;
+use core::marker::PhantomData;
 
 /// An interface for dealing with streaming iterators.
 pub trait StreamingIterator {
