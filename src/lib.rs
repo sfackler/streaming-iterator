@@ -562,6 +562,15 @@ where
     fn count(self) -> usize {
         self.it.count()
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        self.it.fold(init, move |acc, item| f(acc, &item))
+    }
 }
 
 impl<I> DoubleEndedStreamingIterator for Convert<I>
@@ -571,6 +580,15 @@ where
     #[inline]
     fn advance_back(&mut self) {
         self.item = self.it.next_back();
+    }
+
+    #[inline]
+    fn rfold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        self.it.rev().fold(init, move |acc, item| f(acc, &item))
     }
 }
 
@@ -610,6 +628,15 @@ where
     fn count(self) -> usize {
         self.it.count()
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        self.it.fold(init, move |acc, item| f(acc, item))
+    }
 }
 
 impl<'a, I, T: ?Sized> DoubleEndedStreamingIterator for ConvertRef<'a, I, T>
@@ -619,6 +646,15 @@ where
     #[inline]
     fn advance_back(&mut self) {
         self.item = self.it.next_back();
+    }
+
+    #[inline]
+    fn rfold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        self.it.rev().fold(init, move |acc, item| f(acc, item))
     }
 }
 
