@@ -1120,6 +1120,21 @@ where
             hint.1.map(|n| n.saturating_sub(self.n)),
         )
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(mut self, init: Acc, fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        if self.n > 0 {
+            // nth(n) skips n+1
+            if let None = self.it.nth(self.n - 1) {
+                return init;
+            }
+        }
+        self.it.fold(init, fold)
+    }
 }
 
 /// A streaming iterator which skips initial elements that match a predicate
@@ -1157,6 +1172,21 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         let hint = self.it.size_hint();
         (0, hint.1)
+    }
+
+    #[inline]
+    fn fold<Acc, Fold>(mut self, mut init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        if !self.done {
+            match self.next() {
+                Some(item) => init = fold(init, item),
+                None => return init,
+            }
+        }
+        self.it.fold(init, fold)
     }
 }
 
