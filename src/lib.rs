@@ -30,8 +30,8 @@
 #[cfg(feature = "std")]
 extern crate core;
 
-use core::marker::PhantomData;
 use core::cmp;
+use core::marker::PhantomData;
 
 /// An interface for dealing with streaming iterators.
 pub trait StreamingIterator {
@@ -119,15 +119,11 @@ pub trait StreamingIterator {
 
     /// Consumes the iterator, counting the number of remaining elements and returning it.
     #[inline]
-    fn count(mut self) -> usize
+    fn count(self) -> usize
     where
         Self: Sized,
     {
-        let mut count = 0;
-        while let Some(_) = self.next() {
-            count += 1;
-        }
-        count
+        self.fold(0, |count, _| count + 1)
     }
 
     /// Creates an iterator which uses a closure to determine if an element should be yielded.
@@ -319,6 +315,30 @@ pub trait StreamingIterator {
     {
         Rev(self)
     }
+
+    /// Reduces the iterator's elements to a single, final value.
+    #[inline]
+    fn fold<B, F>(mut self, init: B, mut f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, &Self::Item) -> B,
+    {
+        let mut acc = init;
+        while let Some(item) = self.next() {
+            acc = f(acc, item);
+        }
+        acc
+    }
+
+    /// Calls a closure on each element of an iterator.
+    #[inline]
+    fn for_each<F>(self, mut f: F)
+    where
+        Self: Sized,
+        F: FnMut(&Self::Item),
+    {
+        self.fold((), move |(), item| f(item));
+    }
 }
 
 impl<'a, I: ?Sized> StreamingIterator for &'a mut I
@@ -396,6 +416,20 @@ pub trait DoubleEndedStreamingIterator: StreamingIterator {
         self.advance_back();
         (*self).get()
     }
+
+    /// Reduces the iterator's elements to a single, final value, starting from the back.
+    #[inline]
+    fn rfold<B, F>(mut self, init: B, mut f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, &Self::Item) -> B,
+    {
+        let mut acc = init;
+        while let Some(item) = self.next_back() {
+            acc = f(acc, item);
+        }
+        acc
+    }
 }
 
 /// Turns a normal, non-streaming iterator into a streaming iterator.
@@ -471,6 +505,15 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.0.size_hint()
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, Self::Item) -> Acc,
+    {
+        self.0.fold(init, move |acc, item| f(acc, item.clone()))
+    }
 }
 
 impl<I> DoubleEndedIterator for Cloned<I>
@@ -519,6 +562,15 @@ where
     fn count(self) -> usize {
         self.it.count()
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        self.it.fold(init, move |acc, item| f(acc, &item))
+    }
 }
 
 impl<I> DoubleEndedStreamingIterator for Convert<I>
@@ -528,6 +580,15 @@ where
     #[inline]
     fn advance_back(&mut self) {
         self.item = self.it.next_back();
+    }
+
+    #[inline]
+    fn rfold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        self.it.rev().fold(init, move |acc, item| f(acc, &item))
     }
 }
 
@@ -567,6 +628,15 @@ where
     fn count(self) -> usize {
         self.it.count()
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        self.it.fold(init, move |acc, item| f(acc, item))
+    }
 }
 
 impl<'a, I, T: ?Sized> DoubleEndedStreamingIterator for ConvertRef<'a, I, T>
@@ -576,6 +646,15 @@ where
     #[inline]
     fn advance_back(&mut self) {
         self.item = self.it.next_back();
+    }
+
+    #[inline]
+    fn rfold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        self.it.rev().fold(init, move |acc, item| f(acc, item))
     }
 }
 
@@ -611,6 +690,25 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         (0, self.it.size_hint().1)
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it.fold(
+            init,
+            move |acc, item| {
+                if f(item) {
+                    fold(acc, item)
+                } else {
+                    acc
+                }
+            },
+        )
+    }
 }
 
 impl<I, F> DoubleEndedStreamingIterator for Filter<I, F>
@@ -625,6 +723,25 @@ where
                 break;
             }
         }
+    }
+
+    #[inline]
+    fn rfold<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it.rfold(
+            init,
+            move |acc, item| {
+                if f(item) {
+                    fold(acc, item)
+                } else {
+                    acc
+                }
+            },
+        )
     }
 }
 
@@ -668,6 +785,19 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         (0, self.it.size_hint().1)
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it.fold(init, move |acc, item| match f(item) {
+            Some(item) => fold(acc, &item),
+            None => acc,
+        })
+    }
 }
 
 impl<I, B, F> DoubleEndedStreamingIterator for FilterMap<I, B, F>
@@ -689,6 +819,19 @@ where
                 }
             }
         }
+    }
+
+    #[inline]
+    fn rfold<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it.rfold(init, move |acc, item| match f(item) {
+            Some(item) => fold(acc, &item),
+            None => acc,
+        })
     }
 }
 
@@ -776,6 +919,18 @@ where
             FuseState::End => 0,
         }
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        match self.state {
+            FuseState::Start | FuseState::Middle => self.it.fold(init, fold),
+            FuseState::End => init,
+        }
+    }
 }
 
 /// A streaming iterator which transforms the elements of a streaming iterator.
@@ -807,6 +962,16 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.it.size_hint()
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it.fold(init, move |acc, item| fold(acc, &f(item)))
+    }
 }
 
 impl<I, B, F> DoubleEndedStreamingIterator for Map<I, B, F>
@@ -817,6 +982,16 @@ where
     #[inline]
     fn advance_back(&mut self) {
         self.item = self.it.next_back().map(&mut self.f);
+    }
+
+    #[inline]
+    fn rfold<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it.rfold(init, move |acc, item| fold(acc, &f(item)))
     }
 }
 
@@ -853,6 +1028,16 @@ where
     fn next(&mut self) -> Option<&B> {
         self.it.next().map(&self.f)
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let f = self.f;
+        self.it.fold(init, move |acc, item| fold(acc, f(item)))
+    }
 }
 
 /// A normal, non-streaming, iterator which converts the elements of a streaming iterator into owned
@@ -879,6 +1064,15 @@ where
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.0.size_hint()
+    }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, Self::Item) -> Acc,
+    {
+        self.0.fold(init, move |acc, item| f(acc, item.to_owned()))
     }
 }
 
@@ -926,6 +1120,21 @@ where
             hint.1.map(|n| n.saturating_sub(self.n)),
         )
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(mut self, init: Acc, fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        if self.n > 0 {
+            // nth(n) skips n+1
+            if let None = self.it.nth(self.n - 1) {
+                return init;
+            }
+        }
+        self.it.fold(init, fold)
+    }
 }
 
 /// A streaming iterator which skips initial elements that match a predicate
@@ -963,6 +1172,21 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         let hint = self.it.size_hint();
         (0, hint.1)
+    }
+
+    #[inline]
+    fn fold<Acc, Fold>(mut self, mut init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        if !self.done {
+            match self.next() {
+                Some(item) => init = fold(init, item),
+                None => return init,
+            }
+        }
+        self.it.fold(init, fold)
     }
 }
 
@@ -1098,6 +1322,15 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.0.size_hint()
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        self.0.rfold(init, f)
+    }
 }
 
 impl<I> DoubleEndedStreamingIterator for Rev<I>
@@ -1112,6 +1345,15 @@ where
     #[inline]
     fn next_back(&mut self) -> Option<&I::Item> {
         self.0.next()
+    }
+
+    #[inline]
+    fn rfold<Acc, Fold>(self, init: Acc, f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        self.0.fold(init, f)
     }
 }
 
@@ -1332,5 +1574,37 @@ mod test {
         let items = [0, 1, 2, 3];
         let it = convert(items.iter().cloned());
         test(it.clone().rev(), &[3, 2, 1, 0]);
+    }
+
+    #[test]
+    fn fold() {
+        let items = [0, 1, 2, 3];
+        let it = convert(items.iter().cloned());
+        assert_eq!(it.fold(0, |acc, i| acc * 10 + i), 123);
+    }
+
+    #[test]
+    fn for_each() {
+        let items = [0, 1, 2, 3];
+        let it = convert(items.iter().cloned());
+        let mut acc = 0;
+        it.for_each(|i| acc = acc * 10 + i);
+        assert_eq!(acc, 123);
+    }
+
+    #[test]
+    fn rfold() {
+        let items = [0, 1, 2, 3];
+        let it = convert(items.iter().cloned());
+        assert_eq!(it.rfold(0, |acc, i| acc * 10 + i), 3210);
+    }
+
+    #[test]
+    fn for_each_rev() {
+        let items = [0, 1, 2, 3];
+        let it = convert(items.iter().cloned());
+        let mut acc = 0;
+        it.rev().for_each(|i| acc = acc * 10 + i);
+        assert_eq!(acc, 3210);
     }
 }
