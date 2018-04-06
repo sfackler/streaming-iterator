@@ -433,22 +433,31 @@ pub trait DoubleEndedStreamingIterator: StreamingIterator {
 }
 
 /// Turns a normal, non-streaming iterator into a streaming iterator.
+///
+/// ```
+/// # use streaming_iterator::{StreamingIterator, convert};
+/// let scores = vec![100, 50, 80];
+/// let mut streaming_iter = convert(scores);
+/// while let Some(score) = streaming_iter.next() {
+///     println!("The score is: {}", score);
+/// }
+/// ```
 #[inline]
-pub fn convert<I>(it: I) -> Convert<I>
+pub fn convert<I>(it: I) -> Convert<I::IntoIter>
 where
-    I: Iterator,
+    I: IntoIterator,
 {
-    Convert { it: it, item: None }
+    Convert { it: it.into_iter(), item: None }
 }
 
 /// Turns an iterator of references into a streaming iterator.
 #[inline]
-pub fn convert_ref<'a, I, T: ?Sized>(iterator: I) -> ConvertRef<'a, I, T>
+pub fn convert_ref<'a, I, T: ?Sized>(iterator: I) -> ConvertRef<'a, I::IntoIter, T>
 where
-    I: Iterator<Item = &'a T>,
+    I: IntoIterator<Item = &'a T>,
 {
     ConvertRef {
-        it: iterator,
+        it: iterator.into_iter(),
         item: None,
     }
 }
