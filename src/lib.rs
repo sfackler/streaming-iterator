@@ -339,6 +339,25 @@ pub trait StreamingIterator {
     {
         self.fold((), move |(), item| f(item));
     }
+
+    /// Switch to another iterator if switch returns true, step is called
+    /// with each value
+    #[inline]
+    fn or_if<S, F, C, I: StreamingIterator<Item=Self::Item>>(self, initial_state: S, step: F, switch: C, it: I) -> OrIf<Self, S, F, C, I>
+        where Self: Sized,
+              F: FnMut(&S, &Self::Item) -> S,
+              C: FnMut(&S) -> bool
+    {
+        OrIf {
+            it: self,
+            state: initial_state,
+            step: step,
+            switch: switch,
+            alternative: it,
+            done: false,
+            bypass: false,
+        }
+    }
 }
 
 impl<'a, I: ?Sized> StreamingIterator for &'a mut I
@@ -1363,6 +1382,57 @@ where
         Fold: FnMut(Acc, &Self::Item) -> Acc,
     {
         self.0.fold(init, f)
+    }
+}
+
+/// A streaming iterator which will continue with another operator when the
+/// instructed to by switch.
+pub struct OrIf<I, S, F, C, J> {
+    it: I,
+    alternative: J,
+    state: S,
+    step: F,
+    switch: C,
+    done: bool,
+    bypass: bool,
+}
+
+impl<I, S, F, C, J> StreamingIterator for OrIf<I, S, F, C, J>
+    where I: StreamingIterator,
+          J: StreamingIterator<Item=I::Item>,
+          F: FnMut(&S, &I::Item) -> S,
+          C: FnMut(&S) -> bool
+{
+    type Item = I::Item;
+
+    #[inline]
+    fn advance(&mut self) {
+        if self.done {
+        } else if !self.bypass {
+            self.it.advance();
+            if let Some(item) = self.it.get() {
+                self.state = (self.step)(&self.state, item);
+                if (self.switch)(&self.state) {
+                    self.bypass = true;
+                    self.alternative.advance();
+                }
+            } else {
+                self.done = true;
+            }
+        } else {
+            self.alternative.advance();
+        }
+    }
+
+    #[inline]
+    fn get(&self) -> Option<&I::Item> {
+        if self.done {
+            return None
+        } else if !self.bypass {
+            self.it.get()
+        } else {
+            self.alternative.get()
+        }
     }
 }
 
