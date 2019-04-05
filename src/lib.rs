@@ -1033,7 +1033,7 @@ where
     }
 }
 
-/// An regular, non-streaming iterator which both filters and maps elements of a streaming iterator with a closure.
+/// A regular, non-streaming iterator which both filters and maps elements of a streaming iterator with a closure.
 #[derive(Debug)]
 pub struct FilterMapDeref<I, F> {
     it: I,
