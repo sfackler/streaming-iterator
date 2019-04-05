@@ -150,6 +150,22 @@ pub trait StreamingIterator {
         }
     }
 
+    /// Creates an iterator which flattens iterators obtained by applying a closure to elements.
+    /// Note that the returned iterators must be streaming iterators.
+    #[inline]
+    fn flat_map<J, F>(self, f: F) -> FlatMap<Self, J, F>
+    where
+        Self: Sized,
+        J: StreamingIterator,
+        F: FnMut(&Self::Item) -> J,
+    {
+        FlatMap {
+            it: self,
+            f,
+            sub_iter: None,
+        }
+    }
+
     /// Returns the first element of the iterator that satisfies the predicate.
     #[inline]
     fn find<F>(&mut self, mut f: F) -> Option<&Self::Item>
@@ -844,6 +860,38 @@ where
     }
 }
 
+#[derive(Debug)]
+pub struct FlatMap<I, J, F> {
+    it: I,
+    f: F,
+    sub_iter: Option<J>,
+}
+
+impl<I, J, F> StreamingIterator for FlatMap<I, J, F>
+where
+    I: StreamingIterator,
+    F: FnMut(&I::Item) -> J,
+    J: StreamingIterator,
+{
+    type Item = J::Item;
+
+    #[inline]
+    fn advance(&mut self) {
+        while self.sub_iter.as_mut().and_then(J::next).is_none() {
+            if let Some(item) = self.it.next() {
+                self.sub_iter = Some((self.f)(item));
+            } else {
+                break;
+            }
+        }
+    }
+
+    #[inline]
+    fn get(&self) -> Option<&Self::Item> {
+        self.sub_iter.as_ref().and_then(J::get)
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 enum FuseState {
     Start,
@@ -1491,6 +1539,14 @@ mod test {
         let items = [Foo(0), Foo(1)];
         let it = convert(items.iter().cloned()).map_ref(|f| &f.0);
         test(it, &[0, 1]);
+    }
+
+    #[test]
+    fn flat_map() {
+        let items = [[0, 1, 2], [3, 4, 5]];
+        let it = convert(items.iter()).flat_map(|i| convert(i.iter()));
+
+        test(it, &[&0, &1, &2, &3, &4, &5]);
     }
 
     #[test]
