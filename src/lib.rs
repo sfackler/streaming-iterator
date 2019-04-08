@@ -1546,9 +1546,9 @@ mod test {
     #[test]
     fn flat_map() {
         let items = [[0, 1, 2], [3, 4, 5]];
-        let it = convert(items.iter()).flat_map(|i| convert(i.iter()));
+        let it = convert(items.iter()).flat_map(|i| convert(i.iter().cloned()));
 
-        test(it, &[&0, &1, &2, &3, &4, &5]);
+        test(it, &[0, 1, 2, 3, 4, 5]);
     }
 
     #[test]
