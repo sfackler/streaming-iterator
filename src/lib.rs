@@ -860,6 +860,8 @@ where
     }
 }
 
+/// A streaming iterator that maps elements to iterators with a closure and then yields the
+/// concatenation of the obtained iterators
 #[derive(Debug)]
 pub struct FlatMap<I, J, F> {
     it: I,
