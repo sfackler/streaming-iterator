@@ -19,8 +19,10 @@
 //! not with an expression that creates an iterator.
 //! For example, the following code will loop forever over the first element of the array:
 //!
-//! ```ignore
+//! ```no_run
+//! use streaming_iterator::{convert, StreamingIterator};
 //! let array = [0, 1, 2, 3];
+//!
 //! while let Some(item) = convert(array.iter()).next() {
 //!   // This is an infinite loop!
 //! }
