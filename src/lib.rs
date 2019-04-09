@@ -1598,17 +1598,6 @@ mod test {
         assert_eq!(it.get(), None);
     }
 
-    fn test_deref<I>(mut it: I, expected: &[I::Item])
-    where
-        I: Iterator,
-        I::Item: Sized + PartialEq + Debug,
-    {
-        for item in expected {
-            assert_eq!(it.next().as_ref(), Some(item));
-        }
-        assert_eq!(it.next(), None)
-    }
-
     #[test]
     fn all() {
         let items = [0, 1, 2];
