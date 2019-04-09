@@ -15,7 +15,8 @@
 //! }
 //! ```
 //!
-//! However, **make sure to only use the above form with a mutable reference to an existing iterator**.
+//! However, **make sure to only use the above form with a mutable reference to an existing iterator**,
+//! not with an expression that creates an iterator.
 //! For example, the following code will loop forever over the first element of the array:
 //!
 //! ```ignore
