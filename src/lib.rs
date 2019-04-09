@@ -186,6 +186,18 @@ pub trait StreamingIterator {
         }
     }
 
+    /// Call a closure on each element, passing the element on.
+    /// The closure is called upon calls to `advance` or `advance_back`, and exactly once per element
+    /// regardless of how many times (if any) `get` is called.
+    #[inline]
+    fn inspect<F>(self, f: F) -> Inspect<Self, F>
+    where
+        F: FnMut(&Self::Item),
+        Self: Sized,
+    {
+        Inspect { it: self, f }
+    }
+
     /// Creates an iterator which transforms elements of this iterator by passing them to a closure.
     #[inline]
     fn map<B, F>(self, f: F) -> Map<Self, B, F>
@@ -941,6 +953,46 @@ where
         }
     }
 }
+/// A streaming iterator that calls a function with element before yielding it.
+#[derive(Debug)]
+pub struct Inspect<I, F> {
+    it: I,
+    f: F,
+}
+
+impl<I, F> StreamingIterator for Inspect<I, F>
+where
+    I: StreamingIterator,
+    F: FnMut(&I::Item),
+{
+    type Item = I::Item;
+
+    fn advance(&mut self) {
+        if let Some(item) = self.it.next() {
+            (self.f)(item);
+        }
+    }
+
+    fn get(&self) -> Option<&Self::Item> {
+        self.it.get()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.it.size_hint()
+    }
+}
+
+impl<I, F> DoubleEndedStreamingIterator for Inspect<I, F>
+where
+    I: DoubleEndedStreamingIterator,
+    F: FnMut(&I::Item),
+{
+    fn advance_back(&mut self) {
+        if let Some(item) = self.it.next_back() {
+            (self.f)(item);
+        }
+    }
+}
 
 /// A streaming iterator which transforms the elements of a streaming iterator.
 #[derive(Debug)]
@@ -1474,6 +1526,24 @@ mod test {
         it.advance();
         assert_eq!(it.get(), None);
         assert_eq!(it.get(), None);
+    }
+
+    #[test]
+    fn inspect() {
+        let items = [0, 1, 2, 3];
+        let mut idx = 0;
+        let mut items_inspected = [-1, -1, -1, -1];
+
+        {
+            let it = convert(items.iter().cloned()).inspect(|&i| {
+                items_inspected[idx] = i;
+                idx += 1;
+            });
+
+            test(it, &items);
+        }
+
+        assert_eq!(&items_inspected, &items);
     }
 
     #[test]
