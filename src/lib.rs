@@ -107,7 +107,7 @@ pub trait StreamingIterator {
         self
     }
 
-    /// Concatenates two iterators
+    /// Consumes two iterators and returns a new iterator that iterates over both in sequence.
     #[inline]
     fn chain<I>(self, other: I) -> Chain<Self, I>
     where
