@@ -15,6 +15,19 @@
 //! }
 //! ```
 //!
+//! However, **make sure to only use the above form with a mutable reference to an existing iterator**,
+//! not with an expression that creates an iterator.
+//! For example, the following code will loop forever over the first element of the array:
+//!
+//! ```no_run
+//! use streaming_iterator::{convert, StreamingIterator};
+//! let array = [0, 1, 2, 3];
+//!
+//! while let Some(item) = convert(array.iter()).next() {
+//!   // This is an infinite loop!
+//! }
+//! ```
+//!
 //! While the standard `Iterator` trait's functionality is based off of the `next` method,
 //! `StreamingIterator`'s functionality is based off of a pair of methods: `advance` and `get`. This
 //! essentially splits the logic of `next` in half (in fact, `StreamingIterator`'s `next` method
