@@ -120,6 +120,20 @@ pub trait StreamingIterator {
         self
     }
 
+    /// Consumes two iterators and returns a new iterator that iterates over both in sequence.
+    #[inline]
+    fn chain<I>(self, other: I) -> Chain<Self, I>
+    where
+        Self: Sized,
+        I: StreamingIterator<Item = Self::Item> + Sized,
+    {
+        Chain {
+            a: self,
+            b: other,
+            state: ChainState::BothForward,
+        }
+    }
+
     /// Produces a normal, non-streaming, iterator by cloning the elements of this iterator.
     #[inline]
     fn cloned(self) -> Cloned<Self>
@@ -531,6 +545,86 @@ impl<I> DoubleEndedStreamingIterator for Empty<I> {
 pub fn empty<I>() -> Empty<I> {
     Empty {
         phantom: PhantomData,
+    }
+}
+
+/// A streaming iterator that concatenates two streaming iterators
+#[derive(Debug)]
+pub struct Chain<A, B> {
+    a: A,
+    b: B,
+    state: ChainState,
+}
+
+#[derive(Debug)]
+enum ChainState {
+    // Both iterators have items remaining and we are iterating forward
+    BothForward,
+    // Both iterators have items remaining and we are iterating backward
+    BothBackward,
+    // Only the front iterator has items
+    Front,
+    // Only the back iterator has items
+    Back,
+}
+
+impl<A, B> StreamingIterator for Chain<A, B>
+where
+    A: StreamingIterator,
+    B: StreamingIterator<Item = A::Item>,
+{
+    type Item = A::Item;
+
+    #[inline]
+    fn advance(&mut self) {
+        use ChainState::*;
+
+        match self.state {
+            BothForward | BothBackward => {
+                self.state = if self.a.next().is_none() {
+                    self.b.advance();
+                    Back
+                } else {
+                    BothForward
+                };
+            }
+            Front => self.a.advance(),
+            Back => self.b.advance(),
+        }
+    }
+
+    #[inline]
+    fn get(&self) -> Option<&Self::Item> {
+        use ChainState::*;
+
+        match self.state {
+            BothForward | Front => self.a.get(),
+            BothBackward | Back => self.b.get(),
+        }
+    }
+}
+
+impl<A, B> DoubleEndedStreamingIterator for Chain<A, B>
+where
+    A: DoubleEndedStreamingIterator,
+    B: DoubleEndedStreamingIterator<Item = A::Item>,
+{
+    #[inline]
+    fn advance_back(&mut self) {
+        use ChainState::*;
+
+        match self.state {
+            BothForward | BothBackward => {
+                self.state = if self.b.next_back().is_none() {
+                    self.a.advance_back();
+                    Front
+                } else {
+                    BothBackward
+                };
+            }
+            Front => self.a.advance_back(),
+            Back => self.b.advance_back(),
+        }
     }
 }
 
@@ -1502,6 +1596,21 @@ mod test {
         assert_eq!(it.get(), None);
     }
 
+    fn test_back<I>(mut it: I, expected: &[I::Item])
+    where
+        I: DoubleEndedStreamingIterator,
+        I::Item: Sized + PartialEq + Debug,
+    {
+        for item in expected {
+            it.advance_back();
+            assert_eq!(it.get(), Some(item));
+            assert_eq!(it.get(), Some(item));
+        }
+        it.advance_back();
+        assert_eq!(it.get(), None);
+        assert_eq!(it.get(), None);
+    }
+
     #[test]
     fn all() {
         let items = [0, 1, 2];
@@ -1516,6 +1625,50 @@ mod test {
         let it = convert(items.iter().cloned());
         assert!(it.clone().any(|&i| i > 1));
         assert!(!it.clone().any(|&i| i > 2));
+    }
+
+    #[test]
+    fn test_chain() {
+        let items_a = [0, 1, 2, 3];
+        let items_b = [10, 20, 30];
+        let expected = [0, 1, 2, 3, 10, 20, 30];
+
+        let it = convert(items_a.iter().cloned()).chain(convert(items_b.iter().cloned()));
+        test(it, &expected);
+    }
+
+    #[test]
+    fn test_chain_back() {
+        let items_a = [0, 1, 2, 3];
+        let items_b = [10, 20, 30];
+        let expected = [30, 20, 10, 3, 2, 1, 0];
+
+        let it = convert(items_a.iter().cloned()).chain(convert(items_b.iter().cloned()));
+        test_back(it, &expected);
+    }
+
+    #[test]
+    fn test_chain_mixed() {
+        let items_a = [0, 1, 2, 3];
+        let items_b = [10, 20, 30];
+
+        let mut it = convert(items_a.iter().cloned()).chain(convert(items_b.iter().cloned()));
+
+        assert_eq!(it.get(), None);
+        it.advance();
+        assert_eq!(it.get().cloned(), Some(0));
+        it.advance_back();
+        assert_eq!(it.get().cloned(), Some(30));
+        it.advance();
+        assert_eq!(it.get().cloned(), Some(1));
+        it.advance_back();
+        assert_eq!(it.get().cloned(), Some(20));
+        it.advance();
+        assert_eq!(it.get().cloned(), Some(2));
+        it.advance_back();
+        assert_eq!(it.get().cloned(), Some(10));
+        it.advance_back();
+        assert_eq!(it.get().cloned(), Some(3));
     }
 
     #[test]
