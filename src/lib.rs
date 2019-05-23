@@ -1187,6 +1187,19 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.it.size_hint()
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it.fold(init, |acc, item| {
+            f(item);
+            fold(acc, item)
+        })
+    }
 }
 
 impl<I, F> DoubleEndedStreamingIterator for Inspect<I, F>
@@ -1198,6 +1211,19 @@ where
         if let Some(item) = self.it.next_back() {
             (self.f)(item);
         }
+    }
+
+    #[inline]
+    fn rfold<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it.rfold(init, |acc, item| {
+            f(item);
+            fold(acc, item)
+        })
     }
 }
 
