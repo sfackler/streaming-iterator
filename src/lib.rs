@@ -602,6 +602,24 @@ where
             BothBackward | Back => self.b.get(),
         }
     }
+
+    #[inline]
+    fn fold<Acc, F>(self, init: Acc, mut f: F) -> Acc
+    where
+        Self: Sized,
+        F: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let mut accum = init;
+        match self.state {
+            ChainState::Back => {}
+            _ => accum = self.a.fold(accum, &mut f),
+        }
+        match self.state {
+            ChainState::Front => {}
+            _ => accum = self.b.fold(accum, &mut f),
+        }
+        accum
+    }
 }
 
 impl<A, B> DoubleEndedStreamingIterator for Chain<A, B>
@@ -625,6 +643,24 @@ where
             Front => self.a.advance_back(),
             Back => self.b.advance_back(),
         }
+    }
+
+    #[inline]
+    fn rfold<Acc, F>(self, init: Acc, mut f: F) -> Acc
+    where
+        Self: Sized,
+        F: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let mut accum = init;
+        match self.state {
+            ChainState::Front => {}
+            _ => accum = self.b.rfold(accum, &mut f),
+        }
+        match self.state {
+            ChainState::Back => {}
+            _ => accum = self.a.rfold(accum, &mut f),
+        }
+        accum
     }
 }
 
