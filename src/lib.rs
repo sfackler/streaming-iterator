@@ -1047,6 +1047,20 @@ where
     fn get(&self) -> Option<&Self::Item> {
         self.sub_iter.as_ref().and_then(J::get)
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let mut acc = init;
+        if let Some(iter) = self.sub_iter {
+            acc = iter.fold(acc, &mut fold);
+        }
+        let mut f = self.f;
+        self.it.fold(acc, |acc, item| f(item).fold(acc, &mut fold))
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
