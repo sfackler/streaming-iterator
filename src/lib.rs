@@ -1270,7 +1270,7 @@ pub struct Owned<I>(I);
 impl<I> Iterator for Owned<I>
 where
     I: StreamingIterator,
-    I::Item: Sized + ToOwned,
+    I::Item: ToOwned,
 {
     type Item = <I::Item as ToOwned>::Owned;
 
@@ -1817,6 +1817,15 @@ mod test {
         let items = [0, 1];
         let it = convert(items.iter().cloned()).owned();
         assert_eq!(it.collect::<Vec<_>>(), items);
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn owned_str() {
+        let s = "The quick brown fox jumps over the lazy dog";
+        let words = s.split_whitespace().map(str::to_owned).collect::<Vec<_>>();
+        let it = convert_ref(s.split_whitespace()).owned();
+        assert_eq!(it.collect::<Vec<_>>(), words);
     }
 
     #[test]
