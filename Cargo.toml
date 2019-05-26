@@ -7,6 +7,9 @@ description = "Streaming iterators"
 repository = "https://github.com/sfackler/streaming-iterator"
 readme = "README.md"
 
+[package.metadata.docs.rs]
+features = ["std"]
+
 [features]
 std = []
 
