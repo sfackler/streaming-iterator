@@ -193,6 +193,16 @@ pub trait StreamingIterator {
         }
     }
 
+    /// Creates a regular, non-streaming iterator which both filters and maps by applying a closure to elements.
+    #[inline]
+    fn filter_map_deref<B, F>(self, f: F) -> FilterMapDeref<Self, F>
+    where
+        Self: Sized,
+        F: FnMut(&Self::Item) -> Option<B>,
+    {
+        FilterMapDeref { it: self, f }
+    }
+
     /// Returns the first element of the iterator that satisfies the predicate.
     #[inline]
     fn find<F>(&mut self, mut f: F) -> Option<&Self::Item>
@@ -253,6 +263,16 @@ pub trait StreamingIterator {
             f: f,
             item: None,
         }
+    }
+
+    /// Creates a regular, non-streaming iterator which transforms elements of this iterator by passing them to a closure.
+    #[inline]
+    fn map_deref<B, F>(self, f: F) -> MapDeref<Self, F>
+    where
+        Self: Sized,
+        F: FnMut(&Self::Item) -> B,
+    {
+        MapDeref { it: self, f }
     }
 
     /// Creates an iterator which transforms elements of this iterator by passing them to a closure.
@@ -1013,6 +1033,49 @@ where
     }
 }
 
+/// A regular, non-streaming iterator which both filters and maps elements of a streaming iterator with a closure.
+#[derive(Debug)]
+pub struct FilterMapDeref<I, F> {
+    it: I,
+    f: F,
+}
+
+impl<I, B, F> Iterator for FilterMapDeref<I, F>
+where
+    I: StreamingIterator,
+    F: FnMut(&I::Item) -> Option<B>,
+{
+    type Item = B;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(item) = self.it.next() {
+            if let Some(mapped) = (self.f)(item) {
+                return Some(mapped);
+            }
+        }
+
+        None
+    }
+}
+
+impl<I, B, F> DoubleEndedIterator for FilterMapDeref<I, F>
+where
+    I: DoubleEndedStreamingIterator,
+    F: FnMut(&I::Item) -> Option<B>,
+{
+    #[inline]
+    fn next_back(&mut self) -> Option<B> {
+        while let Some(item) = self.it.next_back() {
+            if let Some(mapped) = (self.f)(item) {
+                return Some(mapped);
+            }
+        }
+
+        None
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 enum FuseState {
     Start,
@@ -1210,6 +1273,42 @@ where
     {
         let mut f = self.f;
         self.it.rfold(init, move |acc, item| fold(acc, &f(item)))
+    }
+}
+
+/// A regular, non-streaming iterator which transforms the elements of a streaming iterator.
+#[derive(Debug)]
+pub struct MapDeref<I, F> {
+    it: I,
+    f: F,
+}
+
+impl<I, B, F> Iterator for MapDeref<I, F>
+where
+    I: StreamingIterator,
+    F: FnMut(&I::Item) -> B,
+{
+    type Item = B;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.it.next().map(&mut self.f)
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.it.size_hint()
+    }
+}
+
+impl<I, B, F> DoubleEndedIterator for MapDeref<I, F>
+where
+    I: DoubleEndedStreamingIterator,
+    F: FnMut(&I::Item) -> B,
+{
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.it.next_back().map(&mut self.f)
     }
 }
 
@@ -1611,6 +1710,17 @@ mod test {
         assert_eq!(it.get(), None);
     }
 
+    fn test_deref<I>(mut it: I, expected: &[I::Item])
+    where
+        I: Iterator,
+        I::Item: Sized + PartialEq + Debug,
+    {
+        for item in expected {
+            assert_eq!(it.next().as_ref(), Some(item));
+        }
+        assert_eq!(it.next(), None)
+    }
+
     #[test]
     fn all() {
         let items = [0, 1, 2];
@@ -1770,6 +1880,13 @@ mod test {
     }
 
     #[test]
+    fn map_deref() {
+        let items = [0, 1];
+        let it = convert(items.iter().map(|&i| i as usize)).map_deref(|&i| i as i32);
+        test_deref(it, &items);
+    }
+
+    #[test]
     fn map_ref() {
         #[derive(Clone)]
         struct Foo(i32);
@@ -1801,6 +1918,14 @@ mod test {
         let items = [0u8, 1, 1, 2, 4];
         let it = convert(items.iter()).filter_map(|&&i| if i % 2 == 0 { Some(i) } else { None });
         test(it, &[0, 2, 4])
+    }
+
+    #[test]
+    fn filter_map_deref() {
+        let items = [0u8, 1, 1, 2, 4];
+        let it =
+            convert(items.iter()).filter_map_deref(|&&i| if i % 2 == 0 { Some(i) } else { None });
+        test_deref(it, &[0, 2, 4])
     }
 
     #[test]
