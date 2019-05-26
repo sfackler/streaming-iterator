@@ -622,6 +622,24 @@ where
             BothBackward | Back => self.b.get(),
         }
     }
+
+    #[inline]
+    fn fold<Acc, F>(self, init: Acc, mut f: F) -> Acc
+    where
+        Self: Sized,
+        F: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let mut accum = init;
+        match self.state {
+            ChainState::Back => {}
+            _ => accum = self.a.fold(accum, &mut f),
+        }
+        match self.state {
+            ChainState::Front => {}
+            _ => accum = self.b.fold(accum, &mut f),
+        }
+        accum
+    }
 }
 
 impl<A, B> DoubleEndedStreamingIterator for Chain<A, B>
@@ -645,6 +663,24 @@ where
             Front => self.a.advance_back(),
             Back => self.b.advance_back(),
         }
+    }
+
+    #[inline]
+    fn rfold<Acc, F>(self, init: Acc, mut f: F) -> Acc
+    where
+        Self: Sized,
+        F: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let mut accum = init;
+        match self.state {
+            ChainState::Front => {}
+            _ => accum = self.b.rfold(accum, &mut f),
+        }
+        match self.state {
+            ChainState::Back => {}
+            _ => accum = self.a.rfold(accum, &mut f),
+        }
+        accum
     }
 }
 
@@ -1031,6 +1067,20 @@ where
     fn get(&self) -> Option<&Self::Item> {
         self.sub_iter.as_ref().and_then(J::get)
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let mut acc = init;
+        if let Some(iter) = self.sub_iter {
+            acc = iter.fold(acc, &mut fold);
+        }
+        let mut f = self.f;
+        self.it.fold(acc, |acc, item| f(item).fold(acc, &mut fold))
+    }
 }
 
 /// A regular, non-streaming iterator which both filters and maps elements of a streaming iterator with a closure.
@@ -1200,6 +1250,19 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.it.size_hint()
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it.fold(init, |acc, item| {
+            f(item);
+            fold(acc, item)
+        })
+    }
 }
 
 impl<I, F> DoubleEndedStreamingIterator for Inspect<I, F>
@@ -1211,6 +1274,19 @@ where
         if let Some(item) = self.it.next_back() {
             (self.f)(item);
         }
+    }
+
+    #[inline]
+    fn rfold<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it.rfold(init, |acc, item| {
+            f(item);
+            fold(acc, item)
+        })
     }
 }
 
