@@ -1107,6 +1107,19 @@ where
 
         None
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, Self::Item) -> Acc,
+    {
+        let mut map = self.f;
+        self.it.fold(init, move |acc, item| match map(item) {
+            Some(mapped) => f(acc, mapped),
+            None => acc,
+        })
+    }
 }
 
 impl<I, B, F> DoubleEndedIterator for FilterMapDeref<I, F>
@@ -1374,6 +1387,16 @@ where
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.it.size_hint()
+    }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, Self::Item) -> Acc,
+    {
+        let mut map = self.f;
+        self.it.fold(init, move |acc, item| f(acc, map(item)))
     }
 }
 
