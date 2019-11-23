@@ -38,6 +38,8 @@
 //! just a required `next` method, operations like `filter` would be impossible to define.
 #![doc(html_root_url = "https://docs.rs/streaming-iterator/0.1")]
 #![warn(missing_docs)]
+// for compatibility down to Rust 1.19 (`dyn` needs 1.27)
+#![allow(bare_trait_objects)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(feature = "std")]
