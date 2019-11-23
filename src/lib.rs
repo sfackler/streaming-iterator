@@ -292,6 +292,10 @@ pub trait StreamingIterator {
     /// Creates an iterator which transforms elements of this iterator by passing them to a closure.
     ///
     /// Unlike `map`, this method takes a closure that returns a reference into the original value.
+    ///
+    /// The mapping function is only guaranteed to be called at some point before an element
+    /// is actually consumed. This allows an expensive mapping function to be ignored
+    /// during skipping (e.g. `nth`).
     #[inline]
     fn map_ref<B: ?Sized, F>(self, f: F) -> MapRef<Self, F>
     where
@@ -306,7 +310,7 @@ pub trait StreamingIterator {
     fn nth(&mut self, n: usize) -> Option<&Self::Item> {
         for _ in 0..n {
             self.advance();
-            if self.get().is_none() {
+            if self.is_done() {
                 return None;
             }
         }
@@ -403,6 +407,11 @@ pub trait StreamingIterator {
         Self: Sized + DoubleEndedStreamingIterator,
     {
         Rev(self)
+    }
+
+    /// Checks if `get()` will return `None`.
+    fn is_done(&self) -> bool {
+        self.get().is_none()
     }
 
     /// Reduces the iterator's elements to a single, final value.
@@ -1272,6 +1281,11 @@ where
     }
 
     #[inline]
+    fn is_done(&self) -> bool {
+        self.it.get().is_none()
+    }
+
+    #[inline]
     fn fold<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
     where
         Self: Sized,
@@ -1931,6 +1945,23 @@ mod test {
         let mut it: Empty<u8> = empty();
 
         assert_eq!(it.next(), None);
+    }
+
+    #[test]
+    fn is_done_empty() {
+        let mut empty = empty::<u8>();
+        empty.advance();
+        assert!(empty.is_done());
+    }
+
+    #[test]
+    fn is_done_map() {
+        let mut it = convert([1].iter().cloned())
+            .map_ref(|_: &u8| -> &u16 { panic!("only called during get()") });
+        it.advance();
+        assert!(!it.is_done());
+        it.advance();
+        assert!(it.is_done());
     }
 
     #[test]
