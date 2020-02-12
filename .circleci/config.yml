@@ -20,9 +20,24 @@ save_deps: &SAVE_DEPS
 
 version: 2
 jobs:
-  build:
+  build_MSRV:
     docker:
       - image: rust:1.19.0
+    working_directory: ~/build
+    environment:
+      RUSTFLAGS: -D warnings
+    steps:
+      - checkout
+      - *RESTORE_REGISTRY
+      - run: cargo generate-lockfile
+      - *SAVE_REGISTRY
+      - run: rustc --version > ~/rust-version
+      - *RESTORE_DEPS
+      - run: cargo test
+      - run: cargo test --features std
+      - *SAVE_DEPS
+  build_latest:
+    docker:
       - image: rust:latest
     working_directory: ~/build
     environment:
@@ -37,3 +52,10 @@ jobs:
       - run: cargo test
       - run: cargo test --features std
       - *SAVE_DEPS
+
+workflows:
+  version: 2
+  run_tests:
+    jobs:
+      - build_MSRV
+      - build_latest
