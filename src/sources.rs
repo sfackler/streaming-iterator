@@ -189,6 +189,11 @@ impl<T> StreamingIterator for Empty<T> {
     fn get(&self) -> Option<&Self::Item> {
         None
     }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(0))
+    }
 }
 
 impl<T> DoubleEndedStreamingIterator for Empty<T> {
