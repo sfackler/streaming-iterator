@@ -1,5 +1,6 @@
 use super::{DoubleEndedStreamingIterator, StreamingIterator};
 use core::marker::PhantomData;
+use core::usize;
 
 /// Turns a normal, non-streaming iterator into a streaming iterator.
 ///
@@ -64,6 +65,12 @@ pub fn once_with<T, F: FnOnce() -> T>(gen: F) -> OnceWith<T, F> {
         gen: Some(gen),
         item: None,
     }
+}
+
+/// Creates an iterator that returns an item endlessly.
+#[inline]
+pub fn repeat<T>(item: T) -> Repeat<T> {
+    Repeat { item }
 }
 
 /// A streaming iterator which yields elements from a normal, non-streaming, iterator.
@@ -319,4 +326,32 @@ impl<T, F: FnOnce() -> T> DoubleEndedStreamingIterator for OnceWith<T, F> {
     fn advance_back(&mut self) {
         self.advance();
     }
+}
+
+/// A simple iterator that repeats an item endlessly.
+#[derive(Clone, Debug)]
+pub struct Repeat<T> {
+    item: T,
+}
+
+impl<T> StreamingIterator for Repeat<T> {
+    type Item = T;
+
+    #[inline]
+    fn advance(&mut self) {}
+
+    #[inline]
+    fn get(&self) -> Option<&Self::Item> {
+        Some(&self.item)
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (usize::MAX, None)
+    }
+}
+
+impl<T> DoubleEndedStreamingIterator for Repeat<T> {
+    #[inline]
+    fn advance_back(&mut self) {}
 }
