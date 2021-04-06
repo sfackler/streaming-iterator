@@ -42,7 +42,13 @@ pub fn empty<T>() -> Empty<T> {
     }
 }
 
-/// Creates an iterator that returns exactly one item
+/// Creates an iterator that returns items from a function call.
+#[inline]
+pub fn from_fn<T, F: FnMut() -> Option<T>>(gen: F) -> FromFn<T, F> {
+    FromFn { gen, item: None }
+}
+
+/// Creates an iterator that returns exactly one item.
 #[inline]
 pub fn once<T>(item: T) -> Once<T> {
     Once {
@@ -217,6 +223,27 @@ impl<T> StreamingIterator for Empty<T> {
 impl<T> DoubleEndedStreamingIterator for Empty<T> {
     #[inline]
     fn advance_back(&mut self) {}
+}
+
+/// A simple iterator that returns items from a function call.
+#[derive(Clone, Debug)]
+pub struct FromFn<T, F> {
+    gen: F,
+    item: Option<T>,
+}
+
+impl<T, F: FnMut() -> Option<T>> StreamingIterator for FromFn<T, F> {
+    type Item = T;
+
+    #[inline]
+    fn advance(&mut self) {
+        self.item = (self.gen)();
+    }
+
+    #[inline]
+    fn get(&self) -> Option<&Self::Item> {
+        self.item.as_ref()
+    }
 }
 
 /// A simple iterator that returns exactly one item.
