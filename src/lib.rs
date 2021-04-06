@@ -50,6 +50,7 @@ pub use sources::{convert, Convert};
 pub use sources::{convert_ref, ConvertRef};
 pub use sources::{empty, Empty};
 pub use sources::{once, Once};
+pub use sources::{once_with, OnceWith};
 
 /// An interface for dealing with streaming iterators.
 pub trait StreamingIterator {

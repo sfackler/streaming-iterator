@@ -51,6 +51,15 @@ pub fn once<T>(item: T) -> Once<T> {
     }
 }
 
+/// Creates an iterator that returns exactly one item from a function call.
+#[inline]
+pub fn once_with<T, F: FnOnce() -> T>(gen: F) -> OnceWith<T, F> {
+    OnceWith {
+        gen: Some(gen),
+        item: None,
+    }
+}
+
 /// A streaming iterator which yields elements from a normal, non-streaming, iterator.
 #[derive(Clone, Debug)]
 pub struct Convert<I>
@@ -242,6 +251,43 @@ impl<T> StreamingIterator for Once<T> {
 }
 
 impl<T> DoubleEndedStreamingIterator for Once<T> {
+    #[inline]
+    fn advance_back(&mut self) {
+        self.advance();
+    }
+}
+
+/// A simple iterator that returns exactly one item from a function call.
+#[derive(Clone, Debug)]
+pub struct OnceWith<T, F> {
+    gen: Option<F>,
+    item: Option<T>,
+}
+
+impl<T, F: FnOnce() -> T> StreamingIterator for OnceWith<T, F> {
+    type Item = T;
+
+    #[inline]
+    fn advance(&mut self) {
+        self.item = match self.gen.take() {
+            Some(gen) => Some(gen()),
+            None => None,
+        };
+    }
+
+    #[inline]
+    fn get(&self) -> Option<&Self::Item> {
+        self.item.as_ref()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.gen.is_some() as usize;
+        (len, Some(len))
+    }
+}
+
+impl<T, F: FnOnce() -> T> DoubleEndedStreamingIterator for OnceWith<T, F> {
     #[inline]
     fn advance_back(&mut self) {
         self.advance();
