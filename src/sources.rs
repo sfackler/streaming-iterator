@@ -24,6 +24,15 @@ where
 }
 
 /// Turns an iterator of references into a streaming iterator.
+///
+/// ```
+/// # use streaming_iterator::{StreamingIterator, convert_ref};
+/// let scores = vec![100, 50, 80];
+/// let mut streaming_iter = convert_ref(&scores);
+/// while let Some(score) = streaming_iter.next() {
+///     println!("The score is: {}", score);
+/// }
+/// ```
 #[inline]
 pub fn convert_ref<'a, I, T: ?Sized>(iterator: I) -> ConvertRef<'a, I::IntoIter, T>
 where
@@ -36,6 +45,12 @@ where
 }
 
 /// Creates an empty iterator.
+///
+/// ```
+/// # use streaming_iterator::StreamingIterator;
+/// let mut streaming_iter = streaming_iterator::empty::<i32>();
+/// assert_eq!(streaming_iter.next(), None);
+/// ```
 #[inline]
 pub fn empty<T>() -> Empty<T> {
     Empty {
@@ -44,12 +59,32 @@ pub fn empty<T>() -> Empty<T> {
 }
 
 /// Creates an iterator that returns items from a function call.
+///
+/// ```
+/// # use streaming_iterator::StreamingIterator;
+/// let mut count = 0;
+/// let mut streaming_iter = streaming_iterator::from_fn(|| {
+///     count += 1;
+///     if count < 4 { Some(count) } else { None }
+/// });
+/// assert_eq!(streaming_iter.next(), Some(&1));
+/// assert_eq!(streaming_iter.next(), Some(&2));
+/// assert_eq!(streaming_iter.next(), Some(&3));
+/// assert_eq!(streaming_iter.next(), None);
+/// ```
 #[inline]
 pub fn from_fn<T, F: FnMut() -> Option<T>>(gen: F) -> FromFn<T, F> {
     FromFn { gen, item: None }
 }
 
 /// Creates an iterator that returns exactly one item.
+///
+/// ```
+/// # use streaming_iterator::StreamingIterator;
+/// let mut streaming_iter = streaming_iterator::once(1);
+/// assert_eq!(streaming_iter.next(), Some(&1));
+/// assert_eq!(streaming_iter.next(), None);
+/// ```
 #[inline]
 pub fn once<T>(item: T) -> Once<T> {
     Once {
@@ -59,6 +94,15 @@ pub fn once<T>(item: T) -> Once<T> {
 }
 
 /// Creates an iterator that returns exactly one item from a function call.
+///
+/// ```
+/// # use streaming_iterator::StreamingIterator;
+/// #[derive(Debug, PartialEq)]
+/// struct Expensive(i32);
+/// let mut streaming_iter = streaming_iterator::once_with(|| Expensive(1));
+/// assert_eq!(streaming_iter.next(), Some(&Expensive(1)));
+/// assert_eq!(streaming_iter.next(), None);
+/// ```
 #[inline]
 pub fn once_with<T, F: FnOnce() -> T>(gen: F) -> OnceWith<T, F> {
     OnceWith {
@@ -68,18 +112,56 @@ pub fn once_with<T, F: FnOnce() -> T>(gen: F) -> OnceWith<T, F> {
 }
 
 /// Creates an iterator that returns an item endlessly.
+///
+/// ```
+/// # use streaming_iterator::StreamingIterator;
+/// let mut streaming_iter = streaming_iterator::repeat(1);
+/// assert_eq!(streaming_iter.next(), Some(&1));
+/// assert_eq!(streaming_iter.next(), Some(&1));
+/// assert_eq!(streaming_iter.next(), Some(&1));
+/// assert_eq!(streaming_iter.next(), Some(&1));
+/// assert_eq!(streaming_iter.next(), Some(&1));
+/// // ...
+/// ```
 #[inline]
 pub fn repeat<T>(item: T) -> Repeat<T> {
     Repeat { item }
 }
 
 /// Creates an iterator that endlessly returns items from a function call.
+///
+/// ```
+/// # use streaming_iterator::StreamingIterator;
+/// let mut count = 0;
+/// let mut streaming_iter = streaming_iterator::repeat_with(|| {
+///     count += 1;
+///     count
+/// });
+/// assert_eq!(streaming_iter.next(), Some(&1));
+/// assert_eq!(streaming_iter.next(), Some(&2));
+/// assert_eq!(streaming_iter.next(), Some(&3));
+/// assert_eq!(streaming_iter.next(), Some(&4));
+/// assert_eq!(streaming_iter.next(), Some(&5));
+/// // ...
+/// ```
 #[inline]
 pub fn repeat_with<T, F: FnMut() -> T>(gen: F) -> RepeatWith<T, F> {
     RepeatWith { gen, item: None }
 }
 
 /// Creates an iterator where each successive item is computed from the preceding one.
+///
+/// ```
+/// # use streaming_iterator::StreamingIterator;
+/// let mut streaming_iter = streaming_iterator::successors(
+///     Some(1),
+///     |count| if count < 3 { Some(count + 1) } else { None },
+/// );
+/// assert_eq!(streaming_iter.next(), Some(&1));
+/// assert_eq!(streaming_iter.next(), Some(&2));
+/// assert_eq!(streaming_iter.next(), Some(&3));
+/// assert_eq!(streaming_iter.next(), None);
+/// ```
 #[inline]
 pub fn successors<T, F: FnMut(T) -> Option<T>>(first: Option<T>, succ: F) -> Successors<T, F> {
     Successors {
