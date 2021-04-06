@@ -79,6 +79,16 @@ pub fn repeat_with<T, F: FnMut() -> T>(gen: F) -> RepeatWith<T, F> {
     RepeatWith { gen, item: None }
 }
 
+/// Creates an iterator where each successive item is computed from the preceding one.
+#[inline]
+pub fn successors<T, F: FnMut(T) -> Option<T>>(first: Option<T>, succ: F) -> Successors<T, F> {
+    Successors {
+        first: true,
+        item: first,
+        succ,
+    }
+}
+
 /// A streaming iterator which yields elements from a normal, non-streaming, iterator.
 #[derive(Clone, Debug)]
 pub struct Convert<I>
@@ -385,5 +395,43 @@ impl<T, F: FnMut() -> T> StreamingIterator for RepeatWith<T, F> {
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         (usize::MAX, None)
+    }
+}
+
+/// An iterator where each successive item is computed from the preceding one.
+#[derive(Clone, Debug)]
+pub struct Successors<T, F> {
+    first: bool,
+    item: Option<T>,
+    succ: F,
+}
+
+impl<T, F: FnMut(T) -> Option<T>> StreamingIterator for Successors<T, F> {
+    type Item = T;
+
+    #[inline]
+    fn advance(&mut self) {
+        if self.first {
+            self.first = false;
+        } else if let Some(item) = self.item.take() {
+            self.item = (self.succ)(item);
+        }
+    }
+
+    #[inline]
+    fn get(&self) -> Option<&Self::Item> {
+        self.item.as_ref()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match (self.first, &self.item) {
+            // We have a first item and unknown successors
+            (true, &Some(_)) => (1, None),
+            // We only have unknown successors
+            (false, &Some(_)) => (0, None),
+            // We have nothing.
+            (_, &None) => (0, Some(0)),
+        }
     }
 }
