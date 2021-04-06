@@ -42,6 +42,15 @@ pub fn empty<T>() -> Empty<T> {
     }
 }
 
+/// Creates an iterator that returns exactly one item
+#[inline]
+pub fn once<T>(item: T) -> Once<T> {
+    Once {
+        first: true,
+        item: Some(item),
+    }
+}
+
 /// A streaming iterator which yields elements from a normal, non-streaming, iterator.
 #[derive(Clone, Debug)]
 pub struct Convert<I>
@@ -199,4 +208,42 @@ impl<T> StreamingIterator for Empty<T> {
 impl<T> DoubleEndedStreamingIterator for Empty<T> {
     #[inline]
     fn advance_back(&mut self) {}
+}
+
+/// A simple iterator that returns exactly one item.
+#[derive(Clone, Debug)]
+pub struct Once<T> {
+    first: bool,
+    item: Option<T>,
+}
+
+impl<T> StreamingIterator for Once<T> {
+    type Item = T;
+
+    #[inline]
+    fn advance(&mut self) {
+        if self.first {
+            self.first = false;
+        } else {
+            self.item = None;
+        }
+    }
+
+    #[inline]
+    fn get(&self) -> Option<&Self::Item> {
+        self.item.as_ref()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.first as usize;
+        (len, Some(len))
+    }
+}
+
+impl<T> DoubleEndedStreamingIterator for Once<T> {
+    #[inline]
+    fn advance_back(&mut self) {
+        self.advance();
+    }
 }
