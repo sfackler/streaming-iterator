@@ -73,6 +73,12 @@ pub fn repeat<T>(item: T) -> Repeat<T> {
     Repeat { item }
 }
 
+/// Creates an iterator that endlessly returns items from a function call.
+#[inline]
+pub fn repeat_with<T, F: FnMut() -> T>(gen: F) -> RepeatWith<T, F> {
+    RepeatWith { gen, item: None }
+}
+
 /// A streaming iterator which yields elements from a normal, non-streaming, iterator.
 #[derive(Clone, Debug)]
 pub struct Convert<I>
@@ -354,4 +360,30 @@ impl<T> StreamingIterator for Repeat<T> {
 impl<T> DoubleEndedStreamingIterator for Repeat<T> {
     #[inline]
     fn advance_back(&mut self) {}
+}
+
+/// A simple iterator that endlessly returns items from a function call.
+#[derive(Clone, Debug)]
+pub struct RepeatWith<T, F> {
+    gen: F,
+    item: Option<T>,
+}
+
+impl<T, F: FnMut() -> T> StreamingIterator for RepeatWith<T, F> {
+    type Item = T;
+
+    #[inline]
+    fn advance(&mut self) {
+        self.item = Some((self.gen)());
+    }
+
+    #[inline]
+    fn get(&self) -> Option<&Self::Item> {
+        self.item.as_ref()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (usize::MAX, None)
+    }
 }

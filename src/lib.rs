@@ -53,6 +53,7 @@ pub use sources::{from_fn, FromFn};
 pub use sources::{once, Once};
 pub use sources::{once_with, OnceWith};
 pub use sources::{repeat, Repeat};
+pub use sources::{repeat_with, RepeatWith};
 
 /// An interface for dealing with streaming iterators.
 pub trait StreamingIterator {
