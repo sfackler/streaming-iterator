@@ -49,6 +49,7 @@ use core::cmp;
 
 mod sources;
 pub use sources::{convert, Convert};
+pub use sources::{convert_mut, ConvertMut};
 pub use sources::{convert_ref, ConvertRef};
 pub use sources::{empty, Empty};
 pub use sources::{from_fn, FromFn};
@@ -540,6 +541,117 @@ pub trait DoubleEndedStreamingIterator: StreamingIterator {
     }
 }
 
+/// An interface for dealing with mutable streaming iterators.
+pub trait StreamingIteratorMut: StreamingIterator {
+    /// Returns a mutable reference to the current element of the iterator.
+    ///
+    /// The behavior of calling this method before `advance` has been called is unspecified.
+    ///
+    /// Modifications through this reference may also have an unspecified effect on further
+    /// iterator advancement, but implementations are encouraged to document this.
+    fn get_mut(&mut self) -> Option<&mut Self::Item>;
+
+    /// Advances the iterator and returns the next mutable value.
+    ///
+    /// The behavior of calling this method after the end of the iterator has been reached is
+    /// unspecified.
+    ///
+    /// The default implementation simply calls `advance` followed by `get_mut`.
+    #[inline]
+    fn next_mut(&mut self) -> Option<&mut Self::Item> {
+        self.advance();
+        (*self).get_mut()
+    }
+
+    /// Reduces the iterator's mutable elements to a single, final value.
+    #[inline]
+    fn fold_mut<B, F>(mut self, init: B, mut f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, &mut Self::Item) -> B,
+    {
+        let mut acc = init;
+        while let Some(item) = self.next_mut() {
+            acc = f(acc, item);
+        }
+        acc
+    }
+
+    /// Calls a closure on each mutable element of an iterator.
+    #[inline]
+    fn for_each_mut<F>(self, mut f: F)
+    where
+        Self: Sized,
+        F: FnMut(&mut Self::Item),
+    {
+        self.fold_mut((), move |(), item| f(item));
+    }
+}
+
+impl<'a, I: ?Sized> StreamingIteratorMut for &'a mut I
+where
+    I: StreamingIteratorMut,
+{
+    #[inline]
+    fn get_mut(&mut self) -> Option<&mut Self::Item> {
+        (**self).get_mut()
+    }
+
+    #[inline]
+    fn next_mut(&mut self) -> Option<&mut Self::Item> {
+        (**self).next_mut()
+    }
+}
+
+#[cfg(feature = "std")]
+impl<I: ?Sized> StreamingIteratorMut for Box<I>
+where
+    I: StreamingIteratorMut,
+{
+    #[inline]
+    fn get_mut(&mut self) -> Option<&mut Self::Item> {
+        (**self).get_mut()
+    }
+
+    #[inline]
+    fn next_mut(&mut self) -> Option<&mut Self::Item> {
+        (**self).next_mut()
+    }
+}
+
+/// A mutable streaming iterator able to yield elements from both ends.
+pub trait DoubleEndedStreamingIteratorMut:
+    DoubleEndedStreamingIterator + StreamingIteratorMut
+{
+    /// Advances the iterator and returns the next mutable value from the back.
+    ///
+    /// The behavior of calling this method after the end of the iterator has been reached is
+    /// unspecified.
+    ///
+    /// The default implementation simply calls `advance_back` followed by `get_mut`.
+    #[inline]
+    fn next_back_mut(&mut self) -> Option<&mut Self::Item> {
+        self.advance_back();
+        (*self).get_mut()
+    }
+
+    /// Reduces the iterator's mutable elements to a single, final value, starting from the back.
+    #[inline]
+    fn rfold_mut<B, F>(mut self, init: B, mut f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, &mut Self::Item) -> B,
+    {
+        let mut acc = init;
+        while let Some(item) = self.next_back_mut() {
+            acc = f(acc, item);
+        }
+        acc
+    }
+}
+// Note, in theory we could blanket-impl `DoubleEndedStreamingIteratorMut`, but that
+// wouldn't allow custom folding until we can do it with Rust specialization.
+
 /// A streaming iterator that concatenates two streaming iterators
 #[derive(Debug)]
 pub struct Chain<A, B> {
@@ -663,6 +775,63 @@ where
         match self.state {
             ChainState::Back => {}
             _ => accum = self.a.rfold(accum, &mut f),
+        }
+        accum
+    }
+}
+
+impl<A, B> StreamingIteratorMut for Chain<A, B>
+where
+    A: StreamingIteratorMut,
+    B: StreamingIteratorMut<Item = A::Item>,
+{
+    #[inline]
+    fn get_mut(&mut self) -> Option<&mut Self::Item> {
+        use ChainState::*;
+
+        match self.state {
+            BothForward | Front => self.a.get_mut(),
+            BothBackward | Back => self.b.get_mut(),
+        }
+    }
+
+    #[inline]
+    fn fold_mut<Acc, F>(self, init: Acc, mut f: F) -> Acc
+    where
+        Self: Sized,
+        F: FnMut(Acc, &mut Self::Item) -> Acc,
+    {
+        let mut accum = init;
+        match self.state {
+            ChainState::Back => {}
+            _ => accum = self.a.fold_mut(accum, &mut f),
+        }
+        match self.state {
+            ChainState::Front => {}
+            _ => accum = self.b.fold_mut(accum, &mut f),
+        }
+        accum
+    }
+}
+
+impl<A, B> DoubleEndedStreamingIteratorMut for Chain<A, B>
+where
+    A: DoubleEndedStreamingIteratorMut,
+    B: DoubleEndedStreamingIteratorMut<Item = A::Item>,
+{
+    fn rfold_mut<Acc, F>(self, init: Acc, mut f: F) -> Acc
+    where
+        Self: Sized,
+        F: FnMut(Acc, &mut Self::Item) -> Acc,
+    {
+        let mut accum = init;
+        match self.state {
+            ChainState::Front => {}
+            _ => accum = self.b.rfold_mut(accum, &mut f),
+        }
+        match self.state {
+            ChainState::Back => {}
+            _ => accum = self.a.rfold_mut(accum, &mut f),
         }
         accum
     }
@@ -803,6 +972,61 @@ where
     }
 }
 
+impl<I, F> StreamingIteratorMut for Filter<I, F>
+where
+    I: StreamingIteratorMut,
+    F: FnMut(&I::Item) -> bool,
+{
+    #[inline]
+    fn get_mut(&mut self) -> Option<&mut I::Item> {
+        self.it.get_mut()
+    }
+
+    #[inline]
+    fn fold_mut<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &mut Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it.fold_mut(
+            init,
+            move |acc, item| {
+                if f(&*item) {
+                    fold(acc, item)
+                } else {
+                    acc
+                }
+            },
+        )
+    }
+}
+
+impl<I, F> DoubleEndedStreamingIteratorMut for Filter<I, F>
+where
+    I: DoubleEndedStreamingIteratorMut,
+    F: FnMut(&I::Item) -> bool,
+{
+    #[inline]
+    fn rfold_mut<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &mut Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it.rfold_mut(
+            init,
+            move |acc, item| {
+                if f(&*item) {
+                    fold(acc, item)
+                } else {
+                    acc
+                }
+            },
+        )
+    }
+}
+
 /// An iterator which both filters and maps elements of a streaming iterator with a closure.
 #[derive(Debug)]
 pub struct FilterMap<I, B, F> {
@@ -897,6 +1121,49 @@ where
     }
 }
 
+impl<I, B, F> StreamingIteratorMut for FilterMap<I, B, F>
+where
+    I: StreamingIterator,
+    F: FnMut(&I::Item) -> Option<B>,
+{
+    #[inline]
+    fn get_mut(&mut self) -> Option<&mut B> {
+        self.item.as_mut()
+    }
+
+    #[inline]
+    fn fold_mut<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &mut Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it.fold(init, move |acc, item| match f(item) {
+            Some(mut item) => fold(acc, &mut item),
+            None => acc,
+        })
+    }
+}
+
+impl<I, B, F> DoubleEndedStreamingIteratorMut for FilterMap<I, B, F>
+where
+    I: DoubleEndedStreamingIterator,
+    F: FnMut(&I::Item) -> Option<B>,
+{
+    #[inline]
+    fn rfold_mut<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &mut Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it.rfold(init, move |acc, item| match f(item) {
+            Some(mut item) => fold(acc, &mut item),
+            None => acc,
+        })
+    }
+}
+
 /// A streaming iterator that maps elements to iterators with a closure and then yields the
 /// concatenation of the obtained iterators
 #[derive(Debug)]
@@ -956,6 +1223,33 @@ where
         }
         let mut f = self.f;
         self.it.fold(acc, |acc, item| f(item).fold(acc, &mut fold))
+    }
+}
+
+impl<I, J, F> StreamingIteratorMut for FlatMap<I, J, F>
+where
+    I: StreamingIterator,
+    F: FnMut(&I::Item) -> J,
+    J: StreamingIteratorMut,
+{
+    #[inline]
+    fn get_mut(&mut self) -> Option<&mut Self::Item> {
+        self.sub_iter.as_mut().and_then(J::get_mut)
+    }
+
+    #[inline]
+    fn fold_mut<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &mut Self::Item) -> Acc,
+    {
+        let mut acc = init;
+        if let Some(iter) = self.sub_iter {
+            acc = iter.fold_mut(acc, &mut fold);
+        }
+        let mut f = self.f;
+        self.it
+            .fold(acc, |acc, item| f(item).fold_mut(acc, &mut fold))
     }
 }
 
@@ -1122,6 +1416,31 @@ where
     }
 }
 
+impl<I> StreamingIteratorMut for Fuse<I>
+where
+    I: StreamingIteratorMut,
+{
+    #[inline]
+    fn get_mut(&mut self) -> Option<&mut I::Item> {
+        match self.state {
+            FuseState::Start | FuseState::End => None,
+            FuseState::Middle => self.it.get_mut(),
+        }
+    }
+
+    #[inline]
+    fn fold_mut<Acc, Fold>(self, init: Acc, fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &mut Self::Item) -> Acc,
+    {
+        match self.state {
+            FuseState::Start | FuseState::Middle => self.it.fold_mut(init, fold),
+            FuseState::End => init,
+        }
+    }
+}
+
 /// A streaming iterator that calls a function with element before yielding it.
 #[derive(Debug)]
 pub struct Inspect<I, F> {
@@ -1194,6 +1513,48 @@ where
     }
 }
 
+impl<I, F> StreamingIteratorMut for Inspect<I, F>
+where
+    I: StreamingIteratorMut,
+    F: FnMut(&I::Item),
+{
+    fn get_mut(&mut self) -> Option<&mut Self::Item> {
+        self.it.get_mut()
+    }
+
+    #[inline]
+    fn fold_mut<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &mut Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it.fold_mut(init, |acc, item| {
+            f(&*item);
+            fold(acc, item)
+        })
+    }
+}
+
+impl<I, F> DoubleEndedStreamingIteratorMut for Inspect<I, F>
+where
+    I: DoubleEndedStreamingIteratorMut,
+    F: FnMut(&I::Item),
+{
+    #[inline]
+    fn rfold_mut<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &mut Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it.rfold_mut(init, |acc, item| {
+            f(&*item);
+            fold(acc, item)
+        })
+    }
+}
+
 /// A streaming iterator which transforms the elements of a streaming iterator.
 #[derive(Debug)]
 pub struct Map<I, B, F> {
@@ -1253,6 +1614,44 @@ where
     {
         let mut f = self.f;
         self.it.rfold(init, move |acc, item| fold(acc, &f(item)))
+    }
+}
+
+impl<I, B, F> StreamingIteratorMut for Map<I, B, F>
+where
+    I: StreamingIterator,
+    F: FnMut(&I::Item) -> B,
+{
+    #[inline]
+    fn get_mut(&mut self) -> Option<&mut B> {
+        self.item.as_mut()
+    }
+
+    #[inline]
+    fn fold_mut<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &mut Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it.fold(init, move |acc, item| fold(acc, &mut f(item)))
+    }
+}
+
+impl<I, B, F> DoubleEndedStreamingIteratorMut for Map<I, B, F>
+where
+    I: DoubleEndedStreamingIterator,
+    F: FnMut(&I::Item) -> B,
+{
+    #[inline]
+    fn rfold_mut<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &mut Self::Item) -> Acc,
+    {
+        let mut f = self.f;
+        self.it
+            .rfold(init, move |acc, item| fold(acc, &mut f(item)))
     }
 }
 
@@ -1454,6 +1853,30 @@ where
     }
 }
 
+impl<I> StreamingIteratorMut for Skip<I>
+where
+    I: StreamingIteratorMut,
+{
+    fn get_mut(&mut self) -> Option<&mut Self::Item> {
+        self.it.get_mut()
+    }
+
+    #[inline]
+    fn fold_mut<Acc, Fold>(mut self, init: Acc, fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &mut Self::Item) -> Acc,
+    {
+        if self.n > 0 {
+            // nth(n) skips n+1
+            if let None = self.it.nth(self.n - 1) {
+                return init;
+            }
+        }
+        self.it.fold_mut(init, fold)
+    }
+}
+
 /// A streaming iterator which skips initial elements that match a predicate
 #[derive(Clone, Debug)]
 pub struct SkipWhile<I, F> {
@@ -1512,6 +1935,31 @@ where
     }
 }
 
+impl<I, F> StreamingIteratorMut for SkipWhile<I, F>
+where
+    I: StreamingIteratorMut,
+    F: FnMut(&I::Item) -> bool,
+{
+    fn get_mut(&mut self) -> Option<&mut Self::Item> {
+        self.it.get_mut()
+    }
+
+    #[inline]
+    fn fold_mut<Acc, Fold>(mut self, mut init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &mut Self::Item) -> Acc,
+    {
+        if !self.done {
+            match self.next_mut() {
+                Some(item) => init = fold(init, item),
+                None => return init,
+            }
+        }
+        self.it.fold_mut(init, fold)
+    }
+}
+
 /// A streaming iterator which only yields a limited number of elements in a streaming iterator.
 #[derive(Clone, Debug)]
 pub struct Take<I> {
@@ -1554,6 +2002,20 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         let hint = self.it.size_hint();
         (cmp::min(hint.0, self.n), Some(self.n))
+    }
+}
+
+impl<I> StreamingIteratorMut for Take<I>
+where
+    I: StreamingIteratorMut,
+{
+    #[inline]
+    fn get_mut(&mut self) -> Option<&mut I::Item> {
+        if self.done {
+            None
+        } else {
+            self.it.get_mut()
+        }
     }
 }
 
@@ -1628,6 +2090,21 @@ where
     }
 }
 
+impl<I, F> StreamingIteratorMut for TakeWhile<I, F>
+where
+    I: StreamingIteratorMut,
+    F: FnMut(&I::Item) -> bool,
+{
+    #[inline]
+    fn get_mut(&mut self) -> Option<&mut I::Item> {
+        if self.done {
+            None
+        } else {
+            self.it.get_mut()
+        }
+    }
+}
+
 /// A streaming iterator which returns elements in the opposite order.
 pub struct Rev<I>(I);
 
@@ -1693,6 +2170,39 @@ where
         Fold: FnMut(Acc, &Self::Item) -> Acc,
     {
         self.0.fold(init, f)
+    }
+}
+
+impl<I> StreamingIteratorMut for Rev<I>
+where
+    I: DoubleEndedStreamingIteratorMut,
+{
+    #[inline]
+    fn get_mut(&mut self) -> Option<&mut I::Item> {
+        self.0.get_mut()
+    }
+
+    #[inline]
+    fn fold_mut<B, F>(self, init: B, f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, &mut Self::Item) -> B,
+    {
+        self.0.rfold_mut(init, f)
+    }
+}
+
+impl<I> DoubleEndedStreamingIteratorMut for Rev<I>
+where
+    I: DoubleEndedStreamingIteratorMut,
+{
+    #[inline]
+    fn rfold_mut<B, F>(self, init: B, f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, &mut Self::Item) -> B,
+    {
+        self.0.fold_mut(init, f)
     }
 }
 
@@ -2019,7 +2529,11 @@ mod test {
         test(it.clone().take_while(|&i| i < 5), &[0, 1, 2, 3]);
     }
 
+    #[allow(bare_trait_objects, unknown_lints)]
     fn _is_object_safe(_: &StreamingIterator<Item = ()>) {}
+
+    #[allow(bare_trait_objects, unknown_lints)]
+    fn _is_object_safe_mut(_: &StreamingIteratorMut<Item = ()>) {}
 
     #[test]
     fn empty_iterator() {
@@ -2083,5 +2597,20 @@ mod test {
         let mut acc = 0;
         it.rev().for_each(|i| acc = acc * 10 + i);
         assert_eq!(acc, 3210);
+    }
+
+    #[test]
+    fn for_each_mut() {
+        let mut items = [0, 1, 2, 3];
+
+        convert_mut(&mut items).for_each_mut(|i: &mut i32| *i += 10);
+        assert_eq!(items, [10, 11, 12, 13]);
+
+        // Note that filter sees a direct `&T` reference,
+        // rather than `&&mut T` like `Iterator` would.
+        convert_mut(&mut items)
+            .filter(|&i: &i32| i & 1 == 0)
+            .for_each_mut(|i: &mut i32| *i /= 2);
+        assert_eq!(items, [5, 11, 6, 13]);
     }
 }
