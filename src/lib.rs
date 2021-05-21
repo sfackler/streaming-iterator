@@ -586,6 +586,17 @@ pub trait StreamingIteratorMut: StreamingIterator {
     {
         self.fold_mut((), move |(), item| f(item));
     }
+
+    /// Creates a regular, non-streaming iterator which transforms mutable elements
+    /// of this iterator by passing them to a closure.
+    #[inline]
+    fn map_deref_mut<B, F>(self, f: F) -> MapDerefMut<Self, F>
+    where
+        Self: Sized,
+        F: FnMut(&mut Self::Item) -> B,
+    {
+        MapDerefMut { it: self, f }
+    }
 }
 
 impl<'a, I: ?Sized> StreamingIteratorMut for &'a mut I
@@ -1701,6 +1712,52 @@ where
     }
 }
 
+/// A regular, non-streaming iterator which transforms the elements of a mutable streaming iterator.
+#[derive(Debug)]
+pub struct MapDerefMut<I, F> {
+    it: I,
+    f: F,
+}
+
+impl<I, B, F> Iterator for MapDerefMut<I, F>
+where
+    I: StreamingIteratorMut,
+    F: FnMut(&mut I::Item) -> B,
+{
+    type Item = B;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.it.next_mut().map(&mut self.f)
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.it.size_hint()
+    }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, Self::Item) -> Acc,
+    {
+        let mut map = self.f;
+        self.it.fold_mut(init, move |acc, item| f(acc, map(item)))
+    }
+}
+
+impl<I, B, F> DoubleEndedIterator for MapDerefMut<I, F>
+where
+    I: DoubleEndedStreamingIteratorMut,
+    F: FnMut(&mut I::Item) -> B,
+{
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.it.next_back_mut().map(&mut self.f)
+    }
+}
+
 /// A streaming iterator which transforms the elements of a streaming iterator.
 #[derive(Debug)]
 pub struct MapRef<I, F> {
@@ -2416,6 +2473,14 @@ mod test {
         let items = [0, 1];
         let it = convert(items.iter().map(|&i| i as usize)).map_deref(|&i| i as i32);
         test_deref(it, &items);
+    }
+
+    #[test]
+    fn map_deref_mut() {
+        let mut items = [1, 2, 3];
+        let it = convert_mut(&mut items).map_deref_mut(|i| -core::mem::replace(i, 0));
+        test_deref(it, &[-1, -2, -3]);
+        assert_eq!(items, [0, 0, 0]);
     }
 
     #[test]
