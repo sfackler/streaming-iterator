@@ -2478,8 +2478,10 @@ mod test {
     #[test]
     fn map_deref_mut() {
         let mut items = [1, 2, 3];
-        let it = convert_mut(&mut items).map_deref_mut(|i| -core::mem::replace(i, 0));
-        test_deref(it, &[-1, -2, -3]);
+        {
+            let it = convert_mut(&mut items).map_deref_mut(|i| -core::mem::replace(i, 0));
+            test_deref(it, &[-1, -2, -3]);
+        }
         assert_eq!(items, [0, 0, 0]);
     }
 

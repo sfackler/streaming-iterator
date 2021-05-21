@@ -50,12 +50,14 @@ where
 /// ```
 /// # use streaming_iterator::{StreamingIteratorMut, convert_mut};
 /// let mut scores = vec![Some(100), None, Some(80)];
-/// let mut streaming_iter = convert_mut(&mut scores);
-/// while let Some(opt_score) = streaming_iter.next_mut() {
-///     if let Some(score) = opt_score.take() {
-///         println!("The score is: {}", score);
+/// {
+///     let mut streaming_iter = convert_mut(&mut scores);
+///     while let Some(opt_score) = streaming_iter.next_mut() {
+///         if let Some(score) = opt_score.take() {
+///             println!("The score is: {}", score);
+///         }
+///         // else already reported
 ///     }
-///     // else already reported
 /// }
 /// assert_eq!(scores, [None, None, None]);
 /// ```
