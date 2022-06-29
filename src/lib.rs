@@ -94,6 +94,11 @@ pub trait StreamingIterator {
         (0, None)
     }
 
+    /// Checks if `get()` will return `None`.
+    fn is_done(&self) -> bool {
+        self.get().is_none()
+    }
+
     /// Determines if all elements of the iterator satisfy a predicate.
     #[inline]
     fn all<F>(&mut self, mut f: F) -> bool
@@ -409,11 +414,6 @@ pub trait StreamingIterator {
         Rev(self)
     }
 
-    /// Checks if `get()` will return `None`.
-    fn is_done(&self) -> bool {
-        self.get().is_none()
-    }
-
     /// Reduces the iterator's elements to a single, final value.
     #[inline]
     fn fold<B, F>(mut self, init: B, mut f: F) -> B
@@ -451,6 +451,11 @@ where
     }
 
     #[inline]
+    fn is_done(&self) -> bool {
+        (**self).is_done()
+    }
+
+    #[inline]
     fn get(&self) -> Option<&Self::Item> {
         (**self).get()
     }
@@ -476,6 +481,11 @@ where
     #[inline]
     fn advance(&mut self) {
         (**self).advance()
+    }
+
+    #[inline]
+    fn is_done(&self) -> bool {
+        (**self).is_done()
     }
 
     #[inline]
@@ -572,6 +582,16 @@ where
             }
             Front => self.a.advance(),
             Back => self.b.advance(),
+        }
+    }
+
+    #[inline]
+    fn is_done(&self) -> bool {
+        use ChainState::*;
+
+        match self.state {
+            BothForward | Front => self.a.is_done(),
+            BothBackward | Back => self.b.is_done(),
         }
     }
 
@@ -710,6 +730,11 @@ where
                 break;
             }
         }
+    }
+
+    #[inline]
+    fn is_done(&self) -> bool {
+        self.it.is_done()
     }
 
     #[inline]
@@ -899,6 +924,14 @@ where
     }
 
     #[inline]
+    fn is_done(&self) -> bool {
+        match self.sub_iter {
+            Some(ref iter) => iter.is_done(),
+            None => true,
+        }
+    }
+
+    #[inline]
     fn get(&self) -> Option<&Self::Item> {
         self.sub_iter.as_ref().and_then(J::get)
     }
@@ -1015,6 +1048,14 @@ where
     }
 
     #[inline]
+    fn is_done(&self) -> bool {
+        match self.state {
+            FuseState::Start | FuseState::End => true,
+            FuseState::Middle => self.it.is_done(),
+        }
+    }
+
+    #[inline]
     fn get(&self) -> Option<&I::Item> {
         match self.state {
             FuseState::Start | FuseState::End => None,
@@ -1089,6 +1130,11 @@ where
         if let Some(item) = self.it.next() {
             (self.f)(item);
         }
+    }
+
+    #[inline]
+    fn is_done(&self) -> bool {
+        self.it.is_done()
     }
 
     fn get(&self) -> Option<&Self::Item> {
@@ -1266,6 +1312,11 @@ where
     }
 
     #[inline]
+    fn is_done(&self) -> bool {
+        self.it.is_done()
+    }
+
+    #[inline]
     fn get(&self) -> Option<&B> {
         self.it.get().map(&self.f)
     }
@@ -1278,11 +1329,6 @@ where
     #[inline]
     fn next(&mut self) -> Option<&B> {
         self.it.next().map(&self.f)
-    }
-
-    #[inline]
-    fn is_done(&self) -> bool {
-        self.it.get().is_none()
     }
 
     #[inline]
@@ -1364,6 +1410,11 @@ where
     }
 
     #[inline]
+    fn is_done(&self) -> bool {
+        self.it.is_done()
+    }
+
+    #[inline]
     fn get(&self) -> Option<&I::Item> {
         self.it.get()
     }
@@ -1420,6 +1471,11 @@ where
     }
 
     #[inline]
+    fn is_done(&self) -> bool {
+        self.it.is_done()
+    }
+
+    #[inline]
     fn get(&self) -> Option<&I::Item> {
         self.it.get()
     }
@@ -1471,6 +1527,11 @@ where
     }
 
     #[inline]
+    fn is_done(&self) -> bool {
+        self.done || self.it.is_done()
+    }
+
+    #[inline]
     fn get(&self) -> Option<&I::Item> {
         if self.done {
             None
@@ -1511,6 +1572,11 @@ where
                 }
             }
         }
+    }
+
+    #[inline]
+    fn is_done(&self) -> bool {
+        self.done || self.it.is_done()
     }
 
     #[inline]
@@ -1564,6 +1630,11 @@ where
     #[inline]
     fn advance(&mut self) {
         self.0.advance_back();
+    }
+
+    #[inline]
+    fn is_done(&self) -> bool {
+        self.0.is_done()
     }
 
     #[inline]
