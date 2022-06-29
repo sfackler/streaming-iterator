@@ -39,7 +39,7 @@
 #![doc(html_root_url = "https://docs.rs/streaming-iterator/0.1")]
 #![warn(missing_docs)]
 // for compatibility down to Rust 1.19 (`dyn` needs 1.27)
-#![allow(bare_trait_objects)]
+#![allow(unknown_lints, bare_trait_objects)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(feature = "std")]
@@ -1956,8 +1956,9 @@ mod test {
 
     #[test]
     fn is_done_map() {
-        let mut it = convert([1].iter().cloned())
-            .map_ref(|_: &u8| -> &u16 { panic!("only called during get()") });
+        let items = [1];
+        let mut it = convert(items.iter().cloned())
+            .map_ref::<u16, _>(|_| panic!("only called during get()"));
         it.advance();
         assert!(!it.is_done());
         it.advance();
