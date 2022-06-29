@@ -1040,14 +1040,15 @@ where
         match self.state {
             FuseState::Start => {
                 self.it.advance();
-                self.state = match self.it.get() {
-                    Some(_) => FuseState::Middle,
-                    None => FuseState::End,
+                self.state = if self.it.is_done() {
+                    FuseState::End
+                } else {
+                    FuseState::Middle
                 };
             }
             FuseState::Middle => {
                 self.it.advance();
-                if let None = self.it.get() {
+                if self.it.is_done() {
                     self.state = FuseState::End;
                 }
             }
@@ -1059,7 +1060,7 @@ where
     fn is_done(&self) -> bool {
         match self.state {
             FuseState::Start | FuseState::End => true,
-            FuseState::Middle => self.it.is_done(),
+            FuseState::Middle => false,
         }
     }
 
@@ -1120,6 +1121,7 @@ where
         }
     }
 }
+
 /// A streaming iterator that calls a function with element before yielding it.
 #[derive(Debug)]
 pub struct Inspect<I, F> {
