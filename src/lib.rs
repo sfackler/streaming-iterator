@@ -38,6 +38,8 @@
 //! just a required `next` method, operations like `filter` would be impossible to define.
 #![doc(html_root_url = "https://docs.rs/streaming-iterator/0.1")]
 #![warn(missing_docs)]
+// for compatibility down to Rust 1.19 (`dyn` needs 1.27)
+#![allow(unknown_lints, bare_trait_objects)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(feature = "std")]
@@ -90,6 +92,11 @@ pub trait StreamingIterator {
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         (0, None)
+    }
+
+    /// Checks if `get()` will return `None`.
+    fn is_done(&self) -> bool {
+        self.get().is_none()
     }
 
     /// Determines if all elements of the iterator satisfy a predicate.
@@ -223,9 +230,11 @@ pub trait StreamingIterator {
         loop {
             self.advance();
             match self.get() {
-                Some(i) => if f(i) {
-                    break;
-                },
+                Some(i) => {
+                    if f(i) {
+                        break;
+                    }
+                }
                 None => break,
             }
         }
@@ -288,6 +297,10 @@ pub trait StreamingIterator {
     /// Creates an iterator which transforms elements of this iterator by passing them to a closure.
     ///
     /// Unlike `map`, this method takes a closure that returns a reference into the original value.
+    ///
+    /// The mapping function is only guaranteed to be called at some point before an element
+    /// is actually consumed. This allows an expensive mapping function to be ignored
+    /// during skipping (e.g. `nth`).
     #[inline]
     fn map_ref<B: ?Sized, F>(self, f: F) -> MapRef<Self, F>
     where
@@ -302,7 +315,7 @@ pub trait StreamingIterator {
     fn nth(&mut self, n: usize) -> Option<&Self::Item> {
         for _ in 0..n {
             self.advance();
-            if self.get().is_none() {
+            if self.is_done() {
                 return None;
             }
         }
@@ -438,6 +451,11 @@ where
     }
 
     #[inline]
+    fn is_done(&self) -> bool {
+        (**self).is_done()
+    }
+
+    #[inline]
     fn get(&self) -> Option<&Self::Item> {
         (**self).get()
     }
@@ -463,6 +481,11 @@ where
     #[inline]
     fn advance(&mut self) {
         (**self).advance()
+    }
+
+    #[inline]
+    fn is_done(&self) -> bool {
+        (**self).is_done()
     }
 
     #[inline]
@@ -550,7 +573,8 @@ where
 
         match self.state {
             BothForward | BothBackward => {
-                self.state = if self.a.next().is_none() {
+                self.a.advance();
+                self.state = if self.a.is_done() {
                     self.b.advance();
                     Back
                 } else {
@@ -559,6 +583,16 @@ where
             }
             Front => self.a.advance(),
             Back => self.b.advance(),
+        }
+    }
+
+    #[inline]
+    fn is_done(&self) -> bool {
+        use ChainState::*;
+
+        match self.state {
+            BothForward | Front => self.a.is_done(),
+            BothBackward | Back => self.b.is_done(),
         }
     }
 
@@ -602,7 +636,8 @@ where
 
         match self.state {
             BothForward | BothBackward => {
-                self.state = if self.b.next_back().is_none() {
+                self.b.advance_back();
+                self.state = if self.b.is_done() {
                     self.a.advance_back();
                     Front
                 } else {
@@ -700,6 +735,11 @@ where
     }
 
     #[inline]
+    fn is_done(&self) -> bool {
+        self.it.is_done()
+    }
+
+    #[inline]
     fn get(&self) -> Option<&I::Item> {
         self.it.get()
     }
@@ -782,10 +822,12 @@ where
     fn advance(&mut self) {
         loop {
             match self.it.next() {
-                Some(i) => if let Some(i) = (self.f)(i) {
-                    self.item = Some(i);
-                    break;
-                },
+                Some(i) => {
+                    if let Some(i) = (self.f)(i) {
+                        self.item = Some(i);
+                        break;
+                    }
+                }
                 None => {
                     self.item = None;
                     break;
@@ -827,10 +869,12 @@ where
     fn advance_back(&mut self) {
         loop {
             match self.it.next_back() {
-                Some(i) => if let Some(i) = (self.f)(i) {
-                    self.item = Some(i);
-                    break;
-                },
+                Some(i) => {
+                    if let Some(i) = (self.f)(i) {
+                        self.item = Some(i);
+                        break;
+                    }
+                }
                 None => {
                     self.item = None;
                     break;
@@ -872,12 +916,26 @@ where
 
     #[inline]
     fn advance(&mut self) {
-        while self.sub_iter.as_mut().and_then(J::next).is_none() {
+        loop {
+            if let Some(ref mut iter) = self.sub_iter {
+                iter.advance();
+                if !iter.is_done() {
+                    break;
+                }
+            }
             if let Some(item) = self.it.next() {
                 self.sub_iter = Some((self.f)(item));
             } else {
                 break;
             }
+        }
+    }
+
+    #[inline]
+    fn is_done(&self) -> bool {
+        match self.sub_iter {
+            Some(ref iter) => iter.is_done(),
+            None => true,
         }
     }
 
@@ -982,18 +1040,27 @@ where
         match self.state {
             FuseState::Start => {
                 self.it.advance();
-                self.state = match self.it.get() {
-                    Some(_) => FuseState::Middle,
-                    None => FuseState::End,
+                self.state = if self.it.is_done() {
+                    FuseState::End
+                } else {
+                    FuseState::Middle
                 };
             }
             FuseState::Middle => {
                 self.it.advance();
-                if let None = self.it.get() {
+                if self.it.is_done() {
                     self.state = FuseState::End;
                 }
             }
             FuseState::End => {}
+        }
+    }
+
+    #[inline]
+    fn is_done(&self) -> bool {
+        match self.state {
+            FuseState::Start | FuseState::End => true,
+            FuseState::Middle => false,
         }
     }
 
@@ -1054,6 +1121,7 @@ where
         }
     }
 }
+
 /// A streaming iterator that calls a function with element before yielding it.
 #[derive(Debug)]
 pub struct Inspect<I, F> {
@@ -1072,6 +1140,11 @@ where
         if let Some(item) = self.it.next() {
             (self.f)(item);
         }
+    }
+
+    #[inline]
+    fn is_done(&self) -> bool {
+        self.it.is_done()
     }
 
     fn get(&self) -> Option<&Self::Item> {
@@ -1249,6 +1322,11 @@ where
     }
 
     #[inline]
+    fn is_done(&self) -> bool {
+        self.it.is_done()
+    }
+
+    #[inline]
     fn get(&self) -> Option<&B> {
         self.it.get().map(&self.f)
     }
@@ -1342,6 +1420,11 @@ where
     }
 
     #[inline]
+    fn is_done(&self) -> bool {
+        self.it.is_done()
+    }
+
+    #[inline]
     fn get(&self) -> Option<&I::Item> {
         self.it.get()
     }
@@ -1398,6 +1481,11 @@ where
     }
 
     #[inline]
+    fn is_done(&self) -> bool {
+        self.it.is_done()
+    }
+
+    #[inline]
     fn get(&self) -> Option<&I::Item> {
         self.it.get()
     }
@@ -1449,6 +1537,11 @@ where
     }
 
     #[inline]
+    fn is_done(&self) -> bool {
+        self.done || self.it.is_done()
+    }
+
+    #[inline]
     fn get(&self) -> Option<&I::Item> {
         if self.done {
             None
@@ -1492,6 +1585,11 @@ where
     }
 
     #[inline]
+    fn is_done(&self) -> bool {
+        self.done || self.it.is_done()
+    }
+
+    #[inline]
     fn get(&self) -> Option<&I::Item> {
         if self.done {
             None
@@ -1506,12 +1604,14 @@ where
             None
         } else {
             match self.it.next() {
-                Some(i) => if (self.f)(i) {
-                    Some(i)
-                } else {
-                    self.done = true;
-                    None
-                },
+                Some(i) => {
+                    if (self.f)(i) {
+                        Some(i)
+                    } else {
+                        self.done = true;
+                        None
+                    }
+                }
                 None => None,
             }
         }
@@ -1540,6 +1640,11 @@ where
     #[inline]
     fn advance(&mut self) {
         self.0.advance_back();
+    }
+
+    #[inline]
+    fn is_done(&self) -> bool {
+        self.0.is_done()
     }
 
     #[inline]
@@ -1921,6 +2026,24 @@ mod test {
         let mut it: Empty<u8> = empty();
 
         assert_eq!(it.next(), None);
+    }
+
+    #[test]
+    fn is_done_empty() {
+        let mut empty = empty::<u8>();
+        empty.advance();
+        assert!(empty.is_done());
+    }
+
+    #[test]
+    fn is_done_map() {
+        let items = [1];
+        let mut it = convert(items.iter().cloned())
+            .map_ref::<u16, _>(|_| panic!("only called during get()"));
+        it.advance();
+        assert!(!it.is_done());
+        it.advance();
+        assert!(it.is_done());
     }
 
     #[test]
