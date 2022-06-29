@@ -573,7 +573,8 @@ where
 
         match self.state {
             BothForward | BothBackward => {
-                self.state = if self.a.next().is_none() {
+                self.a.advance();
+                self.state = if self.a.is_done() {
                     self.b.advance();
                     Back
                 } else {
@@ -635,7 +636,8 @@ where
 
         match self.state {
             BothForward | BothBackward => {
-                self.state = if self.b.next_back().is_none() {
+                self.b.advance_back();
+                self.state = if self.b.is_done() {
                     self.a.advance_back();
                     Front
                 } else {
