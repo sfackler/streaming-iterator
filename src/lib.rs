@@ -916,7 +916,13 @@ where
 
     #[inline]
     fn advance(&mut self) {
-        while self.sub_iter.as_mut().and_then(J::next).is_none() {
+        loop {
+            if let Some(ref mut iter) = self.sub_iter {
+                iter.advance();
+                if !iter.is_done() {
+                    break;
+                }
+            }
             if let Some(item) = self.it.next() {
                 self.sub_iter = Some((self.f)(item));
             } else {
