@@ -178,7 +178,7 @@ pub trait StreamingIterator {
         Self: Sized,
         F: FnMut(&Self::Item) -> bool,
     {
-        Filter { it: self, f: f }
+        Filter { it: self, f }
     }
 
     /// Creates an iterator which both filters and maps by applying a closure to elements.
@@ -190,7 +190,7 @@ pub trait StreamingIterator {
     {
         FilterMap {
             it: self,
-            f: f,
+            f,
             item: None,
         }
     }
@@ -280,7 +280,7 @@ pub trait StreamingIterator {
     {
         Map {
             it: self,
-            f: f,
+            f,
             item: None,
         }
     }
@@ -308,7 +308,7 @@ pub trait StreamingIterator {
         Self: Sized,
         F: Fn(&Self::Item) -> &B,
     {
-        MapRef { it: self, f: f }
+        MapRef { it: self, f }
     }
 
     /// Consumes the first `n` elements of the iterator, returning the next one.
@@ -362,7 +362,7 @@ pub trait StreamingIterator {
     where
         Self: Sized,
     {
-        Skip { it: self, n: n }
+        Skip { it: self, n }
     }
 
     /// Creates an iterator that skips initial elements matching a predicate.
@@ -374,7 +374,7 @@ pub trait StreamingIterator {
     {
         SkipWhile {
             it: self,
-            f: f,
+            f,
             done: false,
         }
     }
@@ -387,7 +387,7 @@ pub trait StreamingIterator {
     {
         Take {
             it: self,
-            n: n,
+            n,
             done: false,
         }
     }
@@ -401,7 +401,7 @@ pub trait StreamingIterator {
     {
         TakeWhile {
             it: self,
-            f: f,
+            f,
             done: false,
         }
     }
@@ -1902,7 +1902,7 @@ where
     {
         if self.n > 0 {
             // nth(n) skips n+1
-            if let None = self.it.nth(self.n - 1) {
+            if self.it.nth(self.n - 1).is_none() {
                 return init;
             }
         }
@@ -1926,7 +1926,7 @@ where
     {
         if self.n > 0 {
             // nth(n) skips n+1
-            if let None = self.it.nth(self.n - 1) {
+            if self.it.nth(self.n - 1).is_none() {
                 return init;
             }
         }
