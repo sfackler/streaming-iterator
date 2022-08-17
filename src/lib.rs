@@ -40,7 +40,7 @@
 #![warn(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use core::cmp;
+use core::{cmp, marker::PhantomData};
 
 mod sources;
 pub use crate::sources::{convert, Convert};
@@ -591,6 +591,19 @@ pub trait StreamingIteratorMut: StreamingIterator {
         F: FnMut(&mut Self::Item) -> B,
     {
         MapDerefMut { it: self, f }
+    }
+
+    /// Creates an iterator which flattens nested streaming iterators.
+    #[inline]
+    fn flatten(self) -> Flatten<Self, Self::Item>
+    where
+        Self: Sized,
+        Self::Item: StreamingIterator + Sized,
+    {
+        Flatten {
+            iter: self,
+            _inner: PhantomData,
+        }
     }
 }
 
@@ -1256,6 +1269,61 @@ where
         let mut f = self.f;
         self.it
             .fold(acc, |acc, item| f(item).fold_mut(acc, &mut fold))
+    }
+}
+
+/// A streaming iterator that flattens nested streaming iterators.
+#[derive(Debug)]
+pub struct Flatten<I, J> {
+    iter: I,
+    _inner: PhantomData<J>,
+}
+
+impl<I, J> StreamingIterator for Flatten<I, J>
+where
+    I: StreamingIteratorMut<Item = J>,
+    J: StreamingIterator,
+{
+    type Item = J::Item;
+
+    #[inline]
+    fn advance(&mut self) {
+        loop {
+            if let Some(ref mut iter) = self.iter.get_mut() {
+                iter.advance();
+                if !iter.is_done() {
+                    break;
+                }
+            }
+            self.iter.advance();
+            if self.iter.is_done() {
+                break;
+            }
+        }
+    }
+
+    #[inline]
+    fn is_done(&self) -> bool {
+        match self.iter.get() {
+            Some(iter) => iter.is_done(),
+            None => true,
+        }
+    }
+
+    #[inline]
+    fn get(&self) -> Option<&Self::Item> {
+        self.iter.get().and_then(|iter| iter.get())
+    }
+}
+
+impl<I, J> StreamingIteratorMut for Flatten<I, J>
+where
+    I: StreamingIteratorMut<Item = J>,
+    J: StreamingIteratorMut,
+{
+    #[inline]
+    fn get_mut(&mut self) -> Option<&mut Self::Item> {
+        self.iter.get_mut().and_then(J::get_mut)
     }
 }
 
