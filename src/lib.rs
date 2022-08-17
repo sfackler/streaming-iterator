@@ -2567,6 +2567,14 @@ mod test {
     }
 
     #[test]
+    fn flatten() {
+        let mut items = [convert([0, 1, 2]), convert([3, 4, 5])];
+        let it = convert_mut(&mut items).flatten();
+
+        test(it, &[0, 1, 2, 3, 4, 5]);
+    }
+
+    #[test]
     fn nth() {
         let items = [0, 1];
         let it = convert(items.iter().cloned());
