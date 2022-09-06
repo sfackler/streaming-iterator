@@ -600,7 +600,11 @@ pub trait StreamingIteratorMut: StreamingIterator {
         Self: Sized,
         Self::Item: StreamingIterator + Sized,
     {
-        Flatten { iter: self }
+        Flatten {
+            iter: self,
+            first: true,
+            inner_first: true,
+        }
     }
 }
 
@@ -1273,6 +1277,8 @@ where
 #[derive(Debug)]
 pub struct Flatten<I> {
     iter: I,
+    first: bool,
+    inner_first: bool,
 }
 
 impl<I, J> StreamingIterator for Flatten<I>
@@ -1284,17 +1290,20 @@ where
 
     #[inline]
     fn advance(&mut self) {
-        loop {
-            if let Some(ref mut iter) = self.iter.get_mut() {
+        if self.first {
+            self.first = false;
+            self.iter.advance();
+        }
+        while let Some(iter) = self.iter.get_mut() {
+            if self.inner_first || !iter.is_done() {
+                self.inner_first = false;
                 iter.advance();
                 if !iter.is_done() {
                     break;
                 }
             }
-            self.iter.advance();
-            if self.iter.is_done() {
-                break;
-            }
+            self.iter.advance(); // since we got Some, self.iter is not done and can be advanced
+            self.inner_first = true;
         }
     }
 
@@ -2564,10 +2573,16 @@ mod test {
 
     #[test]
     fn flatten() {
-        let mut items = [convert([0, 1, 2]), convert([3, 4, 5])];
+        let mut items = [
+            convert_ref([].as_ref()),
+            convert_ref([1].as_ref()),
+            convert_ref([].as_ref()),
+            convert_ref([2, 3].as_ref()),
+            convert_ref([].as_ref()),
+        ];
         let it = convert_mut(&mut items).flatten();
 
-        test(it, &[0, 1, 2, 3, 4, 5]);
+        test(it, &[1, 2, 3]);
     }
 
     #[test]
