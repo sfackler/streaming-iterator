@@ -1319,6 +1319,16 @@ where
     fn get(&self) -> Option<&Self::Item> {
         self.iter.get().and_then(|iter| iter.get())
     }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        self.iter
+            .fold_mut(init, |acc, item| item.fold(acc, &mut fold))
+    }
 }
 
 impl<I, J> StreamingIteratorMut for Flatten<I>
@@ -1329,6 +1339,16 @@ where
     #[inline]
     fn get_mut(&mut self) -> Option<&mut Self::Item> {
         self.iter.get_mut().and_then(J::get_mut)
+    }
+
+    #[inline]
+    fn fold_mut<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &mut Self::Item) -> Acc,
+    {
+        self.iter
+            .fold_mut(init, |acc, item| item.fold_mut(acc, &mut fold))
     }
 }
 
