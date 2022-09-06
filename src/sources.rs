@@ -337,12 +337,12 @@ where
     }
 
     #[inline]
-    fn fold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    fn fold<Acc, Fold>(self, init: Acc, f: Fold) -> Acc
     where
         Self: Sized,
         Fold: FnMut(Acc, &Self::Item) -> Acc,
     {
-        self.it.fold(init, move |acc, item| f(acc, item))
+        self.it.fold(init, f)
     }
 }
 
@@ -356,12 +356,12 @@ where
     }
 
     #[inline]
-    fn rfold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    fn rfold<Acc, Fold>(self, init: Acc, f: Fold) -> Acc
     where
         Self: Sized,
         Fold: FnMut(Acc, &Self::Item) -> Acc,
     {
-        self.it.rev().fold(init, move |acc, item| f(acc, item))
+        self.it.rev().fold(init, f)
     }
 }
 
@@ -447,12 +447,12 @@ where
     }
 
     #[inline]
-    fn fold_mut<B, F>(self, init: B, mut f: F) -> B
+    fn fold_mut<B, F>(self, init: B, f: F) -> B
     where
         Self: Sized,
         F: FnMut(B, &mut Self::Item) -> B,
     {
-        self.it.fold(init, move |acc, item| f(acc, item))
+        self.it.fold(init, f)
     }
 }
 
@@ -461,12 +461,12 @@ where
     I: DoubleEndedIterator<Item = &'a mut T>,
 {
     #[inline]
-    fn rfold_mut<B, F>(self, init: B, mut f: F) -> B
+    fn rfold_mut<B, F>(self, init: B, f: F) -> B
     where
         Self: Sized,
         F: FnMut(B, &mut Self::Item) -> B,
     {
-        self.it.rev().fold(init, move |acc, item| f(acc, item))
+        self.it.rev().fold(init, f)
     }
 }
 
@@ -594,10 +594,7 @@ impl<T, F: FnOnce() -> T> StreamingIterator for OnceWith<T, F> {
 
     #[inline]
     fn advance(&mut self) {
-        self.item = match self.gen.take() {
-            Some(gen) => Some(gen()),
-            None => None,
-        };
+        self.item = self.gen.take().map(|gen| gen());
     }
 
     #[inline]
