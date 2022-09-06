@@ -40,7 +40,7 @@
 #![warn(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use core::{cmp, marker::PhantomData};
+use core::cmp;
 
 mod sources;
 pub use crate::sources::{convert, Convert};
@@ -595,15 +595,12 @@ pub trait StreamingIteratorMut: StreamingIterator {
 
     /// Creates an iterator which flattens nested streaming iterators.
     #[inline]
-    fn flatten(self) -> Flatten<Self, Self::Item>
+    fn flatten(self) -> Flatten<Self>
     where
         Self: Sized,
         Self::Item: StreamingIterator + Sized,
     {
-        Flatten {
-            iter: self,
-            _inner: PhantomData,
-        }
+        Flatten { iter: self }
     }
 }
 
@@ -1274,15 +1271,14 @@ where
 
 /// A streaming iterator that flattens nested streaming iterators.
 #[derive(Debug)]
-pub struct Flatten<I, J> {
+pub struct Flatten<I> {
     iter: I,
-    _inner: PhantomData<J>,
 }
 
-impl<I, J> StreamingIterator for Flatten<I, J>
+impl<I, J> StreamingIterator for Flatten<I>
 where
     I: StreamingIteratorMut<Item = J>,
-    J: StreamingIterator,
+    for<'a> J: StreamingIterator + 'a,
 {
     type Item = J::Item;
 
@@ -1316,10 +1312,10 @@ where
     }
 }
 
-impl<I, J> StreamingIteratorMut for Flatten<I, J>
+impl<I, J> StreamingIteratorMut for Flatten<I>
 where
     I: StreamingIteratorMut<Item = J>,
-    J: StreamingIteratorMut,
+    for<'a> J: StreamingIteratorMut + 'a,
 {
     #[inline]
     fn get_mut(&mut self) -> Option<&mut Self::Item> {
