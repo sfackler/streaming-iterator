@@ -603,7 +603,6 @@ pub trait StreamingIteratorMut: StreamingIterator {
         Flatten {
             iter: self,
             first: true,
-            inner_first: true,
         }
     }
 }
@@ -1278,7 +1277,6 @@ where
 pub struct Flatten<I> {
     iter: I,
     first: bool,
-    inner_first: bool,
 }
 
 impl<I, J> StreamingIterator for Flatten<I>
@@ -1295,15 +1293,11 @@ where
             self.iter.advance();
         }
         while let Some(iter) = self.iter.get_mut() {
-            if self.inner_first || !iter.is_done() {
-                self.inner_first = false;
-                iter.advance();
-                if !iter.is_done() {
-                    break;
-                }
+            iter.advance();
+            if !iter.is_done() {
+                break;
             }
             self.iter.advance(); // since we got Some, self.iter is not done and can be advanced
-            self.inner_first = true;
         }
     }
 
