@@ -38,26 +38,21 @@
 //! just a required `next` method, operations like `filter` would be impossible to define.
 #![doc(html_root_url = "https://docs.rs/streaming-iterator/0.1")]
 #![warn(missing_docs)]
-// for compatibility down to Rust 1.19 (`dyn` needs 1.27)
-#![allow(unknown_lints, bare_trait_objects)]
 #![cfg_attr(not(feature = "std"), no_std)]
-
-#[cfg(feature = "std")]
-extern crate core;
 
 use core::cmp;
 
 mod sources;
-pub use sources::{convert, Convert};
-pub use sources::{convert_mut, ConvertMut};
-pub use sources::{convert_ref, ConvertRef};
-pub use sources::{empty, Empty};
-pub use sources::{from_fn, FromFn};
-pub use sources::{once, Once};
-pub use sources::{once_with, OnceWith};
-pub use sources::{repeat, Repeat};
-pub use sources::{repeat_with, RepeatWith};
-pub use sources::{successors, Successors};
+pub use crate::sources::{convert, Convert};
+pub use crate::sources::{convert_mut, ConvertMut};
+pub use crate::sources::{convert_ref, ConvertRef};
+pub use crate::sources::{empty, Empty};
+pub use crate::sources::{from_fn, FromFn};
+pub use crate::sources::{once, Once};
+pub use crate::sources::{once_with, OnceWith};
+pub use crate::sources::{repeat, Repeat};
+pub use crate::sources::{repeat_with, RepeatWith};
+pub use crate::sources::{successors, Successors};
 
 /// An interface for dealing with streaming iterators.
 pub trait StreamingIterator {
@@ -692,7 +687,7 @@ where
 
     #[inline]
     fn advance(&mut self) {
-        use ChainState::*;
+        use crate::ChainState::*;
 
         match self.state {
             BothForward | BothBackward => {
@@ -711,7 +706,7 @@ where
 
     #[inline]
     fn is_done(&self) -> bool {
-        use ChainState::*;
+        use crate::ChainState::*;
 
         match self.state {
             BothForward | Front => self.a.is_done(),
@@ -721,7 +716,7 @@ where
 
     #[inline]
     fn get(&self) -> Option<&Self::Item> {
-        use ChainState::*;
+        use crate::ChainState::*;
 
         match self.state {
             BothForward | Front => self.a.get(),
@@ -755,7 +750,7 @@ where
 {
     #[inline]
     fn advance_back(&mut self) {
-        use ChainState::*;
+        use crate::ChainState::*;
 
         match self.state {
             BothForward | BothBackward => {
@@ -798,7 +793,7 @@ where
 {
     #[inline]
     fn get_mut(&mut self) -> Option<&mut Self::Item> {
-        use ChainState::*;
+        use crate::ChainState::*;
 
         match self.state {
             BothForward | Front => self.a.get_mut(),
@@ -2596,11 +2591,9 @@ mod test {
         test(it.clone().take_while(|&i| i < 5), &[0, 1, 2, 3]);
     }
 
-    #[allow(bare_trait_objects, unknown_lints)]
-    fn _is_object_safe(_: &StreamingIterator<Item = ()>) {}
+    fn _is_object_safe(_: &dyn StreamingIterator<Item = ()>) {}
 
-    #[allow(bare_trait_objects, unknown_lints)]
-    fn _is_object_safe_mut(_: &StreamingIteratorMut<Item = ()>) {}
+    fn _is_object_safe_mut(_: &dyn StreamingIteratorMut<Item = ()>) {}
 
     #[test]
     fn empty_iterator() {
