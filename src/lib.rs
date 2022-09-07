@@ -1279,12 +1279,12 @@ pub struct Flatten<I> {
     first: bool,
 }
 
-impl<I, J> StreamingIterator for Flatten<I>
+impl<I> StreamingIterator for Flatten<I>
 where
-    I: StreamingIteratorMut<Item = J>,
-    for<'a> J: StreamingIterator + 'a,
+    I: StreamingIteratorMut,
+    I::Item: StreamingIterator,
 {
-    type Item = J::Item;
+    type Item = <I::Item as StreamingIterator>::Item;
 
     #[inline]
     fn advance(&mut self) {
@@ -1311,7 +1311,7 @@ where
 
     #[inline]
     fn get(&self) -> Option<&Self::Item> {
-        self.iter.get().and_then(|iter| iter.get())
+        self.iter.get().and_then(I::Item::get)
     }
 
     #[inline]
@@ -1325,14 +1325,14 @@ where
     }
 }
 
-impl<I, J> StreamingIteratorMut for Flatten<I>
+impl<I> StreamingIteratorMut for Flatten<I>
 where
-    I: StreamingIteratorMut<Item = J>,
-    for<'a> J: StreamingIteratorMut + 'a,
+    I: StreamingIteratorMut,
+    I::Item: StreamingIteratorMut,
 {
     #[inline]
     fn get_mut(&mut self) -> Option<&mut Self::Item> {
-        self.iter.get_mut().and_then(J::get_mut)
+        self.iter.get_mut().and_then(I::Item::get_mut)
     }
 
     #[inline]
