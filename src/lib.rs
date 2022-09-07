@@ -884,6 +884,15 @@ where
     fn next_back(&mut self) -> Option<I::Item> {
         self.0.next_back().map(Clone::clone)
     }
+
+    #[inline]
+    fn rfold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, Self::Item) -> Acc,
+    {
+        self.0.rfold(init, move |acc, item| f(acc, item.clone()))
+    }
 }
 
 /// A streaming iterator which filters the elements of a streaming iterator with a predicate.
@@ -1313,6 +1322,19 @@ where
 
         None
     }
+
+    #[inline]
+    fn rfold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, Self::Item) -> Acc,
+    {
+        let mut map = self.f;
+        self.it.rfold(init, move |acc, item| match map(item) {
+            Some(mapped) => f(acc, mapped),
+            None => acc,
+        })
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -1705,6 +1727,16 @@ where
     fn next_back(&mut self) -> Option<Self::Item> {
         self.it.next_back().map(&mut self.f)
     }
+
+    #[inline]
+    fn rfold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, Self::Item) -> Acc,
+    {
+        let mut map = self.f;
+        self.it.rfold(init, move |acc, item| f(acc, map(item)))
+    }
 }
 
 /// A regular, non-streaming iterator which transforms the elements of a mutable streaming iterator.
@@ -1750,6 +1782,16 @@ where
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         self.it.next_back_mut().map(&mut self.f)
+    }
+
+    #[inline]
+    fn rfold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, Self::Item) -> Acc,
+    {
+        let mut map = self.f;
+        self.it.rfold_mut(init, move |acc, item| f(acc, map(item)))
     }
 }
 
@@ -1848,6 +1890,15 @@ where
     #[inline]
     fn next_back(&mut self) -> Option<<I::Item as ToOwned>::Owned> {
         self.0.next_back().map(ToOwned::to_owned)
+    }
+
+    #[inline]
+    fn rfold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, Self::Item) -> Acc,
+    {
+        self.0.rfold(init, move |acc, item| f(acc, item.to_owned()))
     }
 }
 

@@ -260,7 +260,7 @@ where
         Self: Sized,
         Fold: FnMut(Acc, &Self::Item) -> Acc,
     {
-        self.it.rev().fold(init, move |acc, item| f(acc, &item))
+        self.it.rfold(init, move |acc, item| f(acc, &item))
     }
 }
 
@@ -293,9 +293,7 @@ where
         Self: Sized,
         F: FnMut(B, &mut Self::Item) -> B,
     {
-        self.it
-            .rev()
-            .fold(init, move |acc, mut item| f(acc, &mut item))
+        self.it.rfold(init, move |acc, mut item| f(acc, &mut item))
     }
 }
 
@@ -360,7 +358,7 @@ where
         Self: Sized,
         Fold: FnMut(Acc, &Self::Item) -> Acc,
     {
-        self.it.rev().fold(init, f)
+        self.it.rfold(init, f)
     }
 }
 
@@ -428,7 +426,7 @@ where
         Self: Sized,
         Fold: FnMut(Acc, &Self::Item) -> Acc,
     {
-        self.it.rev().fold(init, move |acc, item| f(acc, item))
+        self.it.rfold(init, move |acc, item| f(acc, item))
     }
 }
 
@@ -464,7 +462,7 @@ where
         Self: Sized,
         F: FnMut(B, &mut Self::Item) -> B,
     {
-        self.it.rev().fold(init, f)
+        self.it.rfold(init, f)
     }
 }
 
