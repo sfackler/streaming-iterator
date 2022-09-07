@@ -6,6 +6,8 @@ license = "MIT OR Apache-2.0"
 description = "Streaming iterators"
 repository = "https://github.com/sfackler/streaming-iterator"
 readme = "README.md"
+edition = "2018"
+rust-version = "1.31"
 
 [package.metadata.docs.rs]
 features = ["std"]

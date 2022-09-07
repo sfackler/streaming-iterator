@@ -304,7 +304,6 @@ where
 pub struct ConvertRef<'a, I, T: ?Sized>
 where
     I: Iterator<Item = &'a T>,
-    T: 'a,
 {
     it: I,
     item: Option<&'a T>,
@@ -370,7 +369,6 @@ where
 pub struct ConvertMut<'a, I, T: ?Sized>
 where
     I: Iterator<Item = &'a mut T>,
-    T: 'a,
 {
     it: I,
     item: Option<&'a mut T>,

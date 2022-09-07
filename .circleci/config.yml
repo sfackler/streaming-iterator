@@ -22,7 +22,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: rust:1.19.0
+      - image: rust:1.31.0
     working_directory: ~/build
     environment:
       RUSTFLAGS: -D warnings
