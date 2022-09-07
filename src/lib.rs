@@ -598,7 +598,7 @@ pub trait StreamingIteratorMut: StreamingIterator {
     fn flatten(self) -> Flatten<Self>
     where
         Self: Sized,
-        Self::Item: StreamingIterator + Sized,
+        Self::Item: StreamingIterator,
     {
         Flatten {
             iter: self,
@@ -2595,6 +2595,20 @@ mod test {
             convert_ref([].as_ref()),
         ];
         let it = convert_mut(&mut items).flatten();
+
+        test(it, &[1, 2, 3]);
+    }
+
+    #[test]
+    fn flatten_unsized() {
+        type DynI32 = dyn StreamingIterator<Item = i32>;
+        let mut items = [
+            &mut once(1) as &mut DynI32,
+            &mut empty(),
+            &mut convert(2..=3),
+        ];
+        let iters = items.iter_mut().map(|iter| &mut **iter);
+        let it = convert_mut(iters).flatten();
 
         test(it, &[1, 2, 3]);
     }
