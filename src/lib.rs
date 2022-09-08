@@ -42,6 +42,9 @@
 
 use core::cmp;
 
+mod slice;
+pub use crate::slice::{windows_mut, WindowsMut};
+
 mod sources;
 pub use crate::sources::{convert, Convert};
 pub use crate::sources::{convert_mut, ConvertMut};
