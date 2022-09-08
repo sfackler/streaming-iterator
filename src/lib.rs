@@ -592,6 +592,19 @@ pub trait StreamingIteratorMut: StreamingIterator {
     {
         MapDerefMut { it: self, f }
     }
+
+    /// Creates an iterator which flattens nested streaming iterators.
+    #[inline]
+    fn flatten(self) -> Flatten<Self>
+    where
+        Self: Sized,
+        Self::Item: StreamingIterator,
+    {
+        Flatten {
+            iter: self,
+            first: true,
+        }
+    }
 }
 
 impl<'a, I: ?Sized> StreamingIteratorMut for &'a mut I
@@ -1265,6 +1278,80 @@ where
         let mut f = self.f;
         self.it
             .fold(acc, |acc, item| f(item).fold_mut(acc, &mut fold))
+    }
+}
+
+/// A streaming iterator that flattens nested streaming iterators.
+#[derive(Debug)]
+pub struct Flatten<I> {
+    iter: I,
+    first: bool,
+}
+
+impl<I> StreamingIterator for Flatten<I>
+where
+    I: StreamingIteratorMut,
+    I::Item: StreamingIterator,
+{
+    type Item = <I::Item as StreamingIterator>::Item;
+
+    #[inline]
+    fn advance(&mut self) {
+        if self.first {
+            self.first = false;
+            self.iter.advance();
+        }
+        while let Some(iter) = self.iter.get_mut() {
+            iter.advance();
+            if !iter.is_done() {
+                break;
+            }
+            self.iter.advance(); // since we got Some, self.iter is not done and can be advanced
+        }
+    }
+
+    #[inline]
+    fn is_done(&self) -> bool {
+        match self.iter.get() {
+            Some(iter) => iter.is_done(),
+            None => true,
+        }
+    }
+
+    #[inline]
+    fn get(&self) -> Option<&Self::Item> {
+        self.iter.get().and_then(I::Item::get)
+    }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &Self::Item) -> Acc,
+    {
+        self.iter
+            .fold_mut(init, |acc, item| item.fold(acc, &mut fold))
+    }
+}
+
+impl<I> StreamingIteratorMut for Flatten<I>
+where
+    I: StreamingIteratorMut,
+    I::Item: StreamingIteratorMut,
+{
+    #[inline]
+    fn get_mut(&mut self) -> Option<&mut Self::Item> {
+        self.iter.get_mut().and_then(I::Item::get_mut)
+    }
+
+    #[inline]
+    fn fold_mut<Acc, Fold>(self, init: Acc, mut fold: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, &mut Self::Item) -> Acc,
+    {
+        self.iter
+            .fold_mut(init, |acc, item| item.fold_mut(acc, &mut fold))
     }
 }
 
@@ -2547,6 +2634,34 @@ mod test {
         let it = convert(items.iter()).flat_map(|i| convert(i.iter().cloned()));
 
         test(it, &[0, 1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn flatten() {
+        let mut items = [
+            convert_ref([].as_ref()),
+            convert_ref([1].as_ref()),
+            convert_ref([].as_ref()),
+            convert_ref([2, 3].as_ref()),
+            convert_ref([].as_ref()),
+        ];
+        let it = convert_mut(&mut items).flatten();
+
+        test(it, &[1, 2, 3]);
+    }
+
+    #[test]
+    fn flatten_unsized() {
+        type DynI32 = dyn StreamingIterator<Item = i32>;
+        let mut items = [
+            &mut once(1) as &mut DynI32,
+            &mut empty(),
+            &mut convert(2..=3),
+        ];
+        let iters = items.iter_mut().map(|iter| &mut **iter);
+        let it = convert_mut(iters).flatten();
+
+        test(it, &[1, 2, 3]);
     }
 
     #[test]
