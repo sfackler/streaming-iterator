@@ -883,7 +883,7 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<I::Item> {
-        self.0.next().map(Clone::clone)
+        self.0.next().cloned()
     }
 
     #[inline]
@@ -908,7 +908,7 @@ where
 {
     #[inline]
     fn next_back(&mut self) -> Option<I::Item> {
-        self.0.next_back().map(Clone::clone)
+        self.0.next_back().cloned()
     }
 
     #[inline]
