@@ -160,6 +160,16 @@ pub trait StreamingIterator {
         Cloned(self)
     }
 
+    /// Produces a normal, non-streaming, iterator by copying the elements of this iterator.
+    #[inline]
+    fn copied(self) -> Copied<Self>
+    where
+        Self: Sized,
+        Self::Item: Copy,
+    {
+        Copied(self)
+    }
+
     /// Consumes the iterator, counting the number of remaining elements and returning it.
     #[inline]
     fn count(self) -> usize
@@ -908,6 +918,58 @@ where
         Fold: FnMut(Acc, Self::Item) -> Acc,
     {
         self.0.rfold(init, move |acc, item| f(acc, item.clone()))
+    }
+}
+
+/// A normal, non-streaming, iterator which converts the elements of a streaming iterator into owned
+/// values by copying them.
+#[derive(Clone, Debug)]
+pub struct Copied<I>(I);
+
+impl<I> Iterator for Copied<I>
+where
+    I: StreamingIterator,
+    I::Item: Copy,
+{
+    type Item = I::Item;
+
+    #[inline]
+    fn next(&mut self) -> Option<I::Item> {
+        self.0.next().map(|&item| item)
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+
+    #[inline]
+    fn fold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, Self::Item) -> Acc,
+    {
+        self.0.fold(init, move |acc, &item| f(acc, item))
+    }
+}
+
+impl<I> DoubleEndedIterator for Copied<I>
+where
+    I: DoubleEndedStreamingIterator,
+    I::Item: Copy,
+{
+    #[inline]
+    fn next_back(&mut self) -> Option<I::Item> {
+        self.0.next_back().map(|&item| item)
+    }
+
+    #[inline]
+    fn rfold<Acc, Fold>(self, init: Acc, mut f: Fold) -> Acc
+    where
+        Self: Sized,
+        Fold: FnMut(Acc, Self::Item) -> Acc,
+    {
+        self.0.rfold(init, move |acc, &item| f(acc, item))
     }
 }
 
@@ -2510,6 +2572,15 @@ mod test {
     fn cloned() {
         let items = [0, 1];
         let mut it = convert(items.iter().cloned()).cloned();
+        assert_eq!(it.next(), Some(0));
+        assert_eq!(it.next(), Some(1));
+        assert_eq!(it.next(), None);
+    }
+
+    #[test]
+    fn copied() {
+        let items = [0, 1];
+        let mut it = convert(items.iter().cloned()).copied();
         assert_eq!(it.next(), Some(0));
         assert_eq!(it.next(), Some(1));
         assert_eq!(it.next(), None);
