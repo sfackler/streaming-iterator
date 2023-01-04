@@ -2406,7 +2406,7 @@ where
 {
     /// Turns an [IntoIterator] into a [StreamingIterator].
     ///
-    /// Calling [into_streaming_iter](IntoStreamingIterator::into_streaming_iter) on an [IntoIterator] is equivalent to using [convert].
+    /// Calling this method on an [IntoIterator] is equivalent to using [convert].
     #[inline]
     fn into_streaming_iter(self) -> Convert<Self::IntoIter> {
         convert(self)
@@ -2414,7 +2414,7 @@ where
 
     /// Turns an [IntoIterator] of references into a [StreamingIterator].
     ///
-    /// Calling [into_streaming_iter_ref](IntoStreamingIterator::into_streaming_iter_ref) on an [IntoIterator] is equivalent to using [convert_ref].
+    /// Calling this method on an [IntoIterator] is equivalent to using [convert_ref].
     #[inline]
     fn into_streaming_iter_ref<'a, T: 'a>(self) -> ConvertRef<'a, Self::IntoIter, T>
     where
@@ -2425,7 +2425,7 @@ where
 
     /// Turns an [IntoIterator] of mutable references into a [StreamingIteratorMut].
     ///
-    /// Calling [into_streaming_iter_mut](IntoStreamingIterator::into_streaming_iter_mut) on an [IntoIterator] is equivalent to using [convert_mut].
+    /// Calling this method on an [IntoIterator] is equivalent to using [convert_mut].
     #[inline]
     fn into_streaming_iter_mut<'a, T: 'a>(self) -> ConvertMut<'a, Self::IntoIter, T>
     where
