@@ -2461,6 +2461,44 @@ where
     }
 }
 
+/// Conversion from [`IntoIterator`] to [`StreamingIterator`].
+pub trait IntoStreamingIterator: IntoIterator
+where
+    Self: Sized,
+{
+    /// Turns an [`IntoIterator`] into a [`StreamingIterator`].
+    ///
+    /// Calling this method on an [`IntoIterator`] is equivalent to using [`convert`].
+    #[inline]
+    fn into_streaming_iter(self) -> Convert<Self::IntoIter> {
+        convert(self)
+    }
+
+    /// Turns an [`IntoIterator`] of references into a [`StreamingIterator`].
+    ///
+    /// Calling this method on an [`IntoIterator`] is equivalent to using [`convert_ref`].
+    #[inline]
+    fn into_streaming_iter_ref<'a, T: ?Sized>(self) -> ConvertRef<'a, Self::IntoIter, T>
+    where
+        Self: IntoIterator<Item = &'a T>,
+    {
+        convert_ref(self)
+    }
+
+    /// Turns an [`IntoIterator`] of mutable references into a [`StreamingIteratorMut`].
+    ///
+    /// Calling this method on an [`IntoIterator`] is equivalent to using [`convert_mut`].
+    #[inline]
+    fn into_streaming_iter_mut<'a, T: ?Sized>(self) -> ConvertMut<'a, Self::IntoIter, T>
+    where
+        Self: IntoIterator<Item = &'a mut T>,
+    {
+        convert_mut(self)
+    }
+}
+
+impl<I> IntoStreamingIterator for I where I: IntoIterator {}
+
 #[cfg(test)]
 mod test {
     use core::fmt::Debug;
@@ -2912,5 +2950,17 @@ mod test {
             .filter(|&i: &i32| i & 1 == 0)
             .for_each_mut(|i: &mut i32| *i /= 2);
         assert_eq!(items, [5, 11, 6, 13]);
+    }
+
+    #[test]
+    fn into_streaming_iter() {
+        let items = [0, 1, 2, 3];
+        let iter = items.into_streaming_iter();
+        test(iter, &items);
+        let iter = (&items).into_streaming_iter_ref();
+        test(iter, &items);
+        let mut mut_items = items;
+        let iter = (&mut mut_items).into_streaming_iter_mut();
+        test(iter, &items);
     }
 }
