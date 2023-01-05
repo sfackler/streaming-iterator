@@ -2416,7 +2416,7 @@ where
     ///
     /// Calling this method on an [`IntoIterator`] is equivalent to using [`convert_ref`].
     #[inline]
-    fn into_streaming_iter_ref<'a, T: 'a>(self) -> ConvertRef<'a, Self::IntoIter, T>
+    fn into_streaming_iter_ref<'a, T: ?Sized>(self) -> ConvertRef<'a, Self::IntoIter, T>
     where
         Self: IntoIterator<Item = &'a T>,
     {
@@ -2427,7 +2427,7 @@ where
     ///
     /// Calling this method on an [`IntoIterator`] is equivalent to using [`convert_mut`].
     #[inline]
-    fn into_streaming_iter_mut<'a, T: 'a>(self) -> ConvertMut<'a, Self::IntoIter, T>
+    fn into_streaming_iter_mut<'a, T: ?Sized>(self) -> ConvertMut<'a, Self::IntoIter, T>
     where
         Self: IntoIterator<Item = &'a mut T>,
     {
