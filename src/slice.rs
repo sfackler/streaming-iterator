@@ -38,18 +38,17 @@ enum Position {
 }
 
 impl<T> WindowsMut<'_, T> {
-    #[allow(clippy::mem_replace_with_default)] // mem::take needs MSRV 1.40
     fn consume(&mut self) {
         match self.position {
             Position::Init => {}
             Position::Front => {
-                let slice = mem::replace(&mut self.slice, &mut []);
+                let slice = mem::take(&mut self.slice);
                 if let Some((_, tail)) = slice.split_first_mut() {
                     self.slice = tail;
                 }
             }
             Position::Back => {
-                let slice = mem::replace(&mut self.slice, &mut []);
+                let slice = mem::take(&mut self.slice);
                 if let Some((_, head)) = slice.split_last_mut() {
                     self.slice = head;
                 }

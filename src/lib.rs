@@ -38,9 +38,15 @@
 //! just a required `next` method, operations like `filter` would be impossible to define.
 #![doc(html_root_url = "https://docs.rs/streaming-iterator/0.1")]
 #![warn(missing_docs)]
-#![cfg_attr(not(feature = "std"), no_std)]
+#![no_std]
+
+#[cfg(feature = "alloc")]
+extern crate alloc;
 
 use core::cmp;
+
+#[cfg(feature = "alloc")]
+use alloc::{borrow::ToOwned, boxed::Box};
 
 mod slice;
 pub use crate::slice::{windows_mut, WindowsMut};
@@ -334,8 +340,8 @@ pub trait StreamingIterator {
     /// Creates a normal, non-streaming, iterator with elements produced by calling `to_owned` on
     /// the elements of this iterator.
     ///
-    /// Requires the `std` feature.
-    #[cfg(feature = "std")]
+    /// Requires the `alloc` feature.
+    #[cfg(feature = "alloc")]
     #[inline]
     fn owned(self) -> Owned<Self>
     where
@@ -480,7 +486,7 @@ where
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl<I: ?Sized> StreamingIterator for Box<I>
 where
     I: StreamingIterator,
@@ -635,7 +641,7 @@ where
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl<I: ?Sized> StreamingIteratorMut for Box<I>
 where
     I: StreamingIteratorMut,
@@ -935,7 +941,7 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<I::Item> {
-        self.0.next().map(|&item| item)
+        self.0.next().copied()
     }
 
     #[inline]
@@ -960,7 +966,7 @@ where
 {
     #[inline]
     fn next_back(&mut self) -> Option<I::Item> {
-        self.0.next_back().map(|&item| item)
+        self.0.next_back().copied()
     }
 
     #[inline]
@@ -2000,12 +2006,12 @@ where
 /// A normal, non-streaming, iterator which converts the elements of a streaming iterator into owned
 /// versions.
 ///
-/// Requires the `std` feature.
-#[cfg(feature = "std")]
+/// Requires the `alloc` feature.
+#[cfg(feature = "alloc")]
 #[derive(Clone, Debug)]
 pub struct Owned<I>(I);
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl<I> Iterator for Owned<I>
 where
     I: StreamingIterator,
@@ -2033,7 +2039,7 @@ where
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl<I> DoubleEndedIterator for Owned<I>
 where
     I: DoubleEndedStreamingIterator,
@@ -2503,6 +2509,9 @@ impl<I> IntoStreamingIterator for I where I: IntoIterator {}
 mod test {
     use core::fmt::Debug;
 
+    #[cfg(feature = "alloc")]
+    use alloc::vec::Vec;
+
     use super::*;
 
     fn test<I>(mut it: I, expected: &[I::Item])
@@ -2549,17 +2558,17 @@ mod test {
     #[test]
     fn all() {
         let items = [0, 1, 2];
-        let it = convert(items.iter().cloned());
+        let mut it = convert(items);
         assert!(it.clone().all(|&i| i < 3));
-        assert!(!it.clone().all(|&i| i % 2 == 0));
+        assert!(!it.all(|&i| i % 2 == 0));
     }
 
     #[test]
     fn any() {
         let items = [0, 1, 2];
-        let it = convert(items.iter().cloned());
+        let mut it = convert(items);
         assert!(it.clone().any(|&i| i > 1));
-        assert!(!it.clone().any(|&i| i > 2));
+        assert!(!it.any(|&i| i > 2));
     }
 
     #[test]
@@ -2568,7 +2577,7 @@ mod test {
         let items_b = [10, 20, 30];
         let expected = [0, 1, 2, 3, 10, 20, 30];
 
-        let it = convert(items_a.iter().cloned()).chain(convert(items_b.iter().cloned()));
+        let it = convert(items_a).chain(convert(items_b));
         test(it, &expected);
     }
 
@@ -2578,7 +2587,7 @@ mod test {
         let items_b = [10, 20, 30];
         let expected = [30, 20, 10, 3, 2, 1, 0];
 
-        let it = convert(items_a.iter().cloned()).chain(convert(items_b.iter().cloned()));
+        let it = convert(items_a).chain(convert(items_b));
         test_back(it, &expected);
     }
 
@@ -2587,29 +2596,29 @@ mod test {
         let items_a = [0, 1, 2, 3];
         let items_b = [10, 20, 30];
 
-        let mut it = convert(items_a.iter().cloned()).chain(convert(items_b.iter().cloned()));
+        let mut it = convert(items_a).chain(convert(items_b));
 
         assert_eq!(it.get(), None);
         it.advance();
-        assert_eq!(it.get().cloned(), Some(0));
+        assert_eq!(it.get().copied(), Some(0));
         it.advance_back();
-        assert_eq!(it.get().cloned(), Some(30));
+        assert_eq!(it.get().copied(), Some(30));
         it.advance();
-        assert_eq!(it.get().cloned(), Some(1));
+        assert_eq!(it.get().copied(), Some(1));
         it.advance_back();
-        assert_eq!(it.get().cloned(), Some(20));
+        assert_eq!(it.get().copied(), Some(20));
         it.advance();
-        assert_eq!(it.get().cloned(), Some(2));
+        assert_eq!(it.get().copied(), Some(2));
         it.advance_back();
-        assert_eq!(it.get().cloned(), Some(10));
+        assert_eq!(it.get().copied(), Some(10));
         it.advance_back();
-        assert_eq!(it.get().cloned(), Some(3));
+        assert_eq!(it.get().copied(), Some(3));
     }
 
     #[test]
     fn cloned() {
         let items = [0, 1];
-        let mut it = convert(items.iter().cloned()).cloned();
+        let mut it = convert(items).cloned();
         assert_eq!(it.next(), Some(0));
         assert_eq!(it.next(), Some(1));
         assert_eq!(it.next(), None);
@@ -2618,7 +2627,7 @@ mod test {
     #[test]
     fn copied() {
         let items = [0, 1];
-        let mut it = convert(items.iter().cloned()).copied();
+        let mut it = convert(items).copied();
         assert_eq!(it.next(), Some(0));
         assert_eq!(it.next(), Some(1));
         assert_eq!(it.next(), None);
@@ -2627,7 +2636,7 @@ mod test {
     #[test]
     fn test_convert() {
         let items = [0, 1];
-        let it = convert(items.iter().cloned());
+        let it = convert(items);
         test(it, &items);
     }
 
@@ -2641,14 +2650,14 @@ mod test {
     #[test]
     fn count() {
         let items = [0, 1, 2, 3];
-        let it = convert(items.iter());
+        let it = convert(items);
         assert_eq!(it.count(), 4);
     }
 
     #[test]
     fn filter() {
         let items = [0, 1, 2, 3];
-        let it = convert(items.iter().cloned()).filter(|x| x % 2 == 0);
+        let it = convert(items).filter(|x| x % 2 == 0);
         test(it, &[0, 2]);
     }
 
@@ -2695,7 +2704,7 @@ mod test {
         let mut items_inspected = [-1, -1, -1, -1];
 
         {
-            let it = convert(items.iter().cloned()).inspect(|&i| {
+            let it = convert(items).inspect(|&i| {
                 items_inspected[idx] = i;
                 idx += 1;
             });
@@ -2736,14 +2745,14 @@ mod test {
         struct Foo(i32);
 
         let items = [Foo(0), Foo(1)];
-        let it = convert(items.iter().cloned()).map_ref(|f| &f.0);
+        let it = convert(items).map_ref(|f| &f.0);
         test(it, &[0, 1]);
     }
 
     #[test]
     fn flat_map() {
         let items = [[0, 1, 2], [3, 4, 5]];
-        let it = convert(items.iter()).flat_map(|i| convert(i.iter().cloned()));
+        let it = convert(items).flat_map(|&i| convert(i));
 
         test(it, &[0, 1, 2, 3, 4, 5]);
     }
@@ -2779,45 +2788,44 @@ mod test {
     #[test]
     fn nth() {
         let items = [0, 1];
-        let it = convert(items.iter().cloned());
+        let mut it = convert(items);
         assert_eq!(it.clone().nth(0), Some(&0));
         assert_eq!(it.clone().nth(1), Some(&1));
-        assert_eq!(it.clone().nth(2), None);
+        assert_eq!(it.nth(2), None);
     }
 
     #[test]
     fn filter_map() {
         let items = [0u8, 1, 1, 2, 4];
-        let it = convert(items.iter()).filter_map(|&&i| if i % 2 == 0 { Some(i) } else { None });
+        let it = convert(items).filter_map(|&i| if i % 2 == 0 { Some(i) } else { None });
         test(it, &[0, 2, 4])
     }
 
     #[test]
     fn filter_map_deref() {
         let items = [0u8, 1, 1, 2, 4];
-        let it =
-            convert(items.iter()).filter_map_deref(|&&i| if i % 2 == 0 { Some(i) } else { None });
+        let it = convert(items).filter_map_deref(|&i| if i % 2 == 0 { Some(i) } else { None });
         test_deref(it, &[0, 2, 4])
     }
 
     #[test]
     fn find() {
         let items = [0, 1];
-        let it = convert(items.iter().cloned());
+        let mut it = convert(items);
         assert_eq!(it.clone().find(|&x| x % 2 == 1), Some(&1));
-        assert_eq!(it.clone().find(|&x| x % 3 == 2), None);
+        assert_eq!(it.find(|&x| x % 3 == 2), None);
     }
 
     #[test]
-    #[cfg(feature = "std")]
+    #[cfg(feature = "alloc")]
     fn owned() {
         let items = [0, 1];
-        let it = convert(items.iter().cloned()).owned();
+        let it = convert(items).owned();
         assert_eq!(it.collect::<Vec<_>>(), items);
     }
 
     #[test]
-    #[cfg(feature = "std")]
+    #[cfg(feature = "alloc")]
     fn owned_str() {
         let s = "The quick brown fox jumps over the lazy dog";
         let words = s.split_whitespace().map(str::to_owned).collect::<Vec<_>>();
@@ -2828,45 +2836,45 @@ mod test {
     #[test]
     fn position() {
         let items = [0, 1];
-        let it = convert(items.iter().cloned());
+        let mut it = convert(items);
         assert_eq!(it.clone().position(|&x| x % 2 == 1), Some(1));
-        assert_eq!(it.clone().position(|&x| x % 3 == 2), None);
+        assert_eq!(it.position(|&x| x % 3 == 2), None);
     }
 
     #[test]
     fn skip() {
         let items = [0, 1, 2, 3];
-        let it = convert(items.iter().cloned());
+        let it = convert(items);
         test(it.clone().skip(0), &[0, 1, 2, 3]);
         test(it.clone().skip(2), &[2, 3]);
-        test(it.clone().skip(5), &[]);
+        test(it.skip(5), &[]);
     }
 
     #[test]
     fn skip_while() {
         let items = [0, 1, 2, 3];
-        let it = convert(items.iter().cloned());
+        let it = convert(items);
         test(it.clone().skip_while(|&i| i < 0), &[0, 1, 2, 3]);
         test(it.clone().skip_while(|&i| i < 2), &[2, 3]);
-        test(it.clone().skip_while(|&i| i < 5), &[]);
+        test(it.skip_while(|&i| i < 5), &[]);
     }
 
     #[test]
     fn take() {
         let items = [0, 1, 2, 3];
-        let it = convert(items.iter().cloned());
+        let it = convert(items);
         test(it.clone().take(0), &[]);
         test(it.clone().take(2), &[0, 1]);
-        test(it.clone().take(5), &[0, 1, 2, 3]);
+        test(it.take(5), &[0, 1, 2, 3]);
     }
 
     #[test]
     fn take_while() {
         let items = [0, 1, 2, 3];
-        let it = convert(items.iter().cloned());
+        let it = convert(items);
         test(it.clone().take_while(|&i| i < 0), &[]);
         test(it.clone().take_while(|&i| i < 2), &[0, 1]);
-        test(it.clone().take_while(|&i| i < 5), &[0, 1, 2, 3]);
+        test(it.take_while(|&i| i < 5), &[0, 1, 2, 3]);
     }
 
     fn _is_object_safe(_: &dyn StreamingIterator<Item = ()>) {}
@@ -2890,8 +2898,7 @@ mod test {
     #[test]
     fn is_done_map() {
         let items = [1];
-        let mut it = convert(items.iter().cloned())
-            .map_ref::<u16, _>(|_| panic!("only called during get()"));
+        let mut it = convert(items).map_ref::<u16, _>(|_| panic!("only called during get()"));
         it.advance();
         assert!(!it.is_done());
         it.advance();
@@ -2901,21 +2908,21 @@ mod test {
     #[test]
     fn rev() {
         let items = [0, 1, 2, 3];
-        let it = convert(items.iter().cloned());
-        test(it.clone().rev(), &[3, 2, 1, 0]);
+        let it = convert(items);
+        test(it.rev(), &[3, 2, 1, 0]);
     }
 
     #[test]
     fn fold() {
         let items = [0, 1, 2, 3];
-        let it = convert(items.iter().cloned());
+        let it = convert(items);
         assert_eq!(it.fold(0, |acc, i| acc * 10 + i), 123);
     }
 
     #[test]
     fn for_each() {
         let items = [0, 1, 2, 3];
-        let it = convert(items.iter().cloned());
+        let it = convert(items);
         let mut acc = 0;
         it.for_each(|i| acc = acc * 10 + i);
         assert_eq!(acc, 123);
@@ -2924,14 +2931,14 @@ mod test {
     #[test]
     fn rfold() {
         let items = [0, 1, 2, 3];
-        let it = convert(items.iter().cloned());
+        let it = convert(items);
         assert_eq!(it.rfold(0, |acc, i| acc * 10 + i), 3210);
     }
 
     #[test]
     fn for_each_rev() {
         let items = [0, 1, 2, 3];
-        let it = convert(items.iter().cloned());
+        let it = convert(items);
         let mut acc = 0;
         it.rev().for_each(|i| acc = acc * 10 + i);
         assert_eq!(acc, 3210);
