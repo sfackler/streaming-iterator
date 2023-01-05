@@ -13,6 +13,7 @@ rust-version = "1.56"
 features = ["std"]
 
 [features]
-std = []
+alloc = []
+std = ["alloc"]
 
 [dependencies]

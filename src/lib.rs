@@ -38,9 +38,15 @@
 //! just a required `next` method, operations like `filter` would be impossible to define.
 #![doc(html_root_url = "https://docs.rs/streaming-iterator/0.1")]
 #![warn(missing_docs)]
-#![cfg_attr(not(feature = "std"), no_std)]
+#![no_std]
+
+#[cfg(feature = "alloc")]
+extern crate alloc;
 
 use core::cmp;
+
+#[cfg(feature = "alloc")]
+use alloc::{borrow::ToOwned, boxed::Box};
 
 mod slice;
 pub use crate::slice::{windows_mut, WindowsMut};
@@ -334,8 +340,8 @@ pub trait StreamingIterator {
     /// Creates a normal, non-streaming, iterator with elements produced by calling `to_owned` on
     /// the elements of this iterator.
     ///
-    /// Requires the `std` feature.
-    #[cfg(feature = "std")]
+    /// Requires the `alloc` feature.
+    #[cfg(feature = "alloc")]
     #[inline]
     fn owned(self) -> Owned<Self>
     where
@@ -480,7 +486,7 @@ where
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl<I: ?Sized> StreamingIterator for Box<I>
 where
     I: StreamingIterator,
@@ -635,7 +641,7 @@ where
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl<I: ?Sized> StreamingIteratorMut for Box<I>
 where
     I: StreamingIteratorMut,
@@ -2000,12 +2006,12 @@ where
 /// A normal, non-streaming, iterator which converts the elements of a streaming iterator into owned
 /// versions.
 ///
-/// Requires the `std` feature.
-#[cfg(feature = "std")]
+/// Requires the `alloc` feature.
+#[cfg(feature = "alloc")]
 #[derive(Clone, Debug)]
 pub struct Owned<I>(I);
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl<I> Iterator for Owned<I>
 where
     I: StreamingIterator,
@@ -2033,7 +2039,7 @@ where
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 impl<I> DoubleEndedIterator for Owned<I>
 where
     I: DoubleEndedStreamingIterator,
@@ -2503,6 +2509,9 @@ impl<I> IntoStreamingIterator for I where I: IntoIterator {}
 mod test {
     use core::fmt::Debug;
 
+    #[cfg(feature = "alloc")]
+    use alloc::vec::Vec;
+
     use super::*;
 
     fn test<I>(mut it: I, expected: &[I::Item])
@@ -2809,7 +2818,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(feature = "std")]
+    #[cfg(feature = "alloc")]
     fn owned() {
         let items = [0, 1];
         let it = convert(items.iter().cloned()).owned();
@@ -2817,7 +2826,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(feature = "std")]
+    #[cfg(feature = "alloc")]
     fn owned_str() {
         let s = "The quick brown fox jumps over the lazy dog";
         let words = s.split_whitespace().map(str::to_owned).collect::<Vec<_>>();
