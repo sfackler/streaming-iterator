@@ -941,7 +941,7 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<I::Item> {
-        self.0.next().map(|&item| item)
+        self.0.next().copied()
     }
 
     #[inline]
@@ -966,7 +966,7 @@ where
 {
     #[inline]
     fn next_back(&mut self) -> Option<I::Item> {
-        self.0.next_back().map(|&item| item)
+        self.0.next_back().copied()
     }
 
     #[inline]
@@ -2600,19 +2600,19 @@ mod test {
 
         assert_eq!(it.get(), None);
         it.advance();
-        assert_eq!(it.get().cloned(), Some(0));
+        assert_eq!(it.get().copied(), Some(0));
         it.advance_back();
-        assert_eq!(it.get().cloned(), Some(30));
+        assert_eq!(it.get().copied(), Some(30));
         it.advance();
-        assert_eq!(it.get().cloned(), Some(1));
+        assert_eq!(it.get().copied(), Some(1));
         it.advance_back();
-        assert_eq!(it.get().cloned(), Some(20));
+        assert_eq!(it.get().copied(), Some(20));
         it.advance();
-        assert_eq!(it.get().cloned(), Some(2));
+        assert_eq!(it.get().copied(), Some(2));
         it.advance_back();
-        assert_eq!(it.get().cloned(), Some(10));
+        assert_eq!(it.get().copied(), Some(10));
         it.advance_back();
-        assert_eq!(it.get().cloned(), Some(3));
+        assert_eq!(it.get().copied(), Some(3));
     }
 
     #[test]
