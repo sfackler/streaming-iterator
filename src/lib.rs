@@ -2399,22 +2399,22 @@ where
     }
 }
 
-/// Conversion from [IntoIterator] to [StreamingIterator].
+/// Conversion from [`IntoIterator`] to [`StreamingIterator`].
 pub trait IntoStreamingIterator: IntoIterator
 where
     Self: Sized,
 {
-    /// Turns an [IntoIterator] into a [StreamingIterator].
+    /// Turns an [`IntoIterator`] into a [`StreamingIterator`].
     ///
-    /// Calling this method on an [IntoIterator] is equivalent to using [convert].
+    /// Calling this method on an [`IntoIterator`] is equivalent to using [`convert`].
     #[inline]
     fn into_streaming_iter(self) -> Convert<Self::IntoIter> {
         convert(self)
     }
 
-    /// Turns an [IntoIterator] of references into a [StreamingIterator].
+    /// Turns an [`IntoIterator`] of references into a [`StreamingIterator`].
     ///
-    /// Calling this method on an [IntoIterator] is equivalent to using [convert_ref].
+    /// Calling this method on an [`IntoIterator`] is equivalent to using [`convert_ref`].
     #[inline]
     fn into_streaming_iter_ref<'a, T: 'a>(self) -> ConvertRef<'a, Self::IntoIter, T>
     where
@@ -2423,9 +2423,9 @@ where
         convert_ref(self)
     }
 
-    /// Turns an [IntoIterator] of mutable references into a [StreamingIteratorMut].
+    /// Turns an [`IntoIterator`] of mutable references into a [`StreamingIteratorMut`].
     ///
-    /// Calling this method on an [IntoIterator] is equivalent to using [convert_mut].
+    /// Calling this method on an [`IntoIterator`] is equivalent to using [`convert_mut`].
     #[inline]
     fn into_streaming_iter_mut<'a, T: 'a>(self) -> ConvertMut<'a, Self::IntoIter, T>
     where
