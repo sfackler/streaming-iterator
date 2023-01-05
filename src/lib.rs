@@ -2558,17 +2558,17 @@ mod test {
     #[test]
     fn all() {
         let items = [0, 1, 2];
-        let it = convert(items);
+        let mut it = convert(items);
         assert!(it.clone().all(|&i| i < 3));
-        assert!(!it.clone().all(|&i| i % 2 == 0));
+        assert!(!it.all(|&i| i % 2 == 0));
     }
 
     #[test]
     fn any() {
         let items = [0, 1, 2];
-        let it = convert(items);
+        let mut it = convert(items);
         assert!(it.clone().any(|&i| i > 1));
-        assert!(!it.clone().any(|&i| i > 2));
+        assert!(!it.any(|&i| i > 2));
     }
 
     #[test]
@@ -2788,10 +2788,10 @@ mod test {
     #[test]
     fn nth() {
         let items = [0, 1];
-        let it = convert(items);
+        let mut it = convert(items);
         assert_eq!(it.clone().nth(0), Some(&0));
         assert_eq!(it.clone().nth(1), Some(&1));
-        assert_eq!(it.clone().nth(2), None);
+        assert_eq!(it.nth(2), None);
     }
 
     #[test]
@@ -2811,9 +2811,9 @@ mod test {
     #[test]
     fn find() {
         let items = [0, 1];
-        let it = convert(items);
+        let mut it = convert(items);
         assert_eq!(it.clone().find(|&x| x % 2 == 1), Some(&1));
-        assert_eq!(it.clone().find(|&x| x % 3 == 2), None);
+        assert_eq!(it.find(|&x| x % 3 == 2), None);
     }
 
     #[test]
@@ -2836,9 +2836,9 @@ mod test {
     #[test]
     fn position() {
         let items = [0, 1];
-        let it = convert(items);
+        let mut it = convert(items);
         assert_eq!(it.clone().position(|&x| x % 2 == 1), Some(1));
-        assert_eq!(it.clone().position(|&x| x % 3 == 2), None);
+        assert_eq!(it.position(|&x| x % 3 == 2), None);
     }
 
     #[test]
@@ -2847,7 +2847,7 @@ mod test {
         let it = convert(items);
         test(it.clone().skip(0), &[0, 1, 2, 3]);
         test(it.clone().skip(2), &[2, 3]);
-        test(it.clone().skip(5), &[]);
+        test(it.skip(5), &[]);
     }
 
     #[test]
@@ -2856,7 +2856,7 @@ mod test {
         let it = convert(items);
         test(it.clone().skip_while(|&i| i < 0), &[0, 1, 2, 3]);
         test(it.clone().skip_while(|&i| i < 2), &[2, 3]);
-        test(it.clone().skip_while(|&i| i < 5), &[]);
+        test(it.skip_while(|&i| i < 5), &[]);
     }
 
     #[test]
@@ -2865,7 +2865,7 @@ mod test {
         let it = convert(items);
         test(it.clone().take(0), &[]);
         test(it.clone().take(2), &[0, 1]);
-        test(it.clone().take(5), &[0, 1, 2, 3]);
+        test(it.take(5), &[0, 1, 2, 3]);
     }
 
     #[test]
@@ -2874,7 +2874,7 @@ mod test {
         let it = convert(items);
         test(it.clone().take_while(|&i| i < 0), &[]);
         test(it.clone().take_while(|&i| i < 2), &[0, 1]);
-        test(it.clone().take_while(|&i| i < 5), &[0, 1, 2, 3]);
+        test(it.take_while(|&i| i < 5), &[0, 1, 2, 3]);
     }
 
     fn _is_object_safe(_: &dyn StreamingIterator<Item = ()>) {}
@@ -2909,7 +2909,7 @@ mod test {
     fn rev() {
         let items = [0, 1, 2, 3];
         let it = convert(items);
-        test(it.clone().rev(), &[3, 2, 1, 0]);
+        test(it.rev(), &[3, 2, 1, 0]);
     }
 
     #[test]
